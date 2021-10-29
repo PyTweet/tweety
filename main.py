@@ -29,7 +29,6 @@ bot.twitter = pytweet.Client(
 async def on_ready():
     print(f"In online as {bot.twitter.user.username} - {bot.twitter.user.id}")
 
-
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandOnCooldown):
@@ -42,6 +41,9 @@ async def on_command_error(ctx, error):
     else:
         raise error
 
+@bot.command(description="Get the bot's ping")
+async def ping(ctx):
+    await ctx.send(f"PONG! `{round(bot.latency * 1000)}`")
 
 @bot.command(description="Get a user info through the user's id or username")
 @commands.cooldown(1, 5, commands.BucketType.user)

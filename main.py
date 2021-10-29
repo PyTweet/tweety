@@ -31,7 +31,15 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandOnCooldown):
+    if isinstance(error, commands.CommandInvokeError):
+        err=error.original
+        if isinstance(err, pytweet.errors.TooManyRequests):
+            await ctx.send("Runtime Error. Return code: 429. Rate limit exceeded!")
+
+        else:
+            raise error
+
+    elif isinstance(error, commands.CommandOnCooldown):
         await ctx.send(f"Im on cooldown! Please wait {error.retry_after:.2f} seconds")
 
     elif isinstance(error, commands.NotOwner):
@@ -43,10 +51,10 @@ async def on_command_error(ctx, error):
 
 @bot.command(description="Get the bot's ping")
 async def ping(ctx):
-    await ctx.send(f"PONG! `{round(bot.latency * 1000)}`")
+    await ctx.send(f"PONG! `{round(bot.latency * 1000)}MS`")
 
 @bot.command(description="Get a user info through the user's id or username")
-@commands.cooldown(1, 5, commands.BucketType.user)
+@commands.cooldown(1, 10, commands.BucketType.user)
 async def user(ctx, username: str):
     try:
         user = bot.twitter.get_user_by_username(username)
@@ -75,7 +83,7 @@ async def user(ctx, username: str):
 
 
 @bot.command(description="Get a tweet info through the tweet's id")
-@commands.cooldown(1, 5, commands.BucketType.user)
+@commands.cooldown(1, 10, commands.BucketType.user)
 async def tweet(ctx, tweet_id: int):
     try:
         tweet = bot.twitter.get_tweet(tweet_id)
@@ -97,9 +105,9 @@ async def tweet(ctx, tweet_id: int):
                 icon_url=user.avatar_url,
             )
             .add_field(name="Likes Count 👍", value=tweet.like_count)
-            .add_field(name="quotes Count 📰", value=tweet.quote_count)
+            .add_field(name="Quotes Count 📰", value=tweet.quote_count)
             .add_field(name="Replies Count 🗨️", value=tweet.reply_count)
-            .add_field(name="retweetes Count 🗨️", value=tweet.retweet_count)
+            .add_field(name="Retweetes Count 🗨️", value=tweet.retweet_count)
         )
 
     except pytweet.errors.NotFoundError:
@@ -110,7 +118,7 @@ async def tweet(ctx, tweet_id: int):
     description="Follow a user, only an owner of the server can do this command"
 )
 @commands.is_owner()
-@commands.cooldown(1, 5, commands.BucketType.user)
+@commands.cooldown(1, 10, commands.BucketType.user)
 async def follow(ctx, username: str):
     try:
         user = None
@@ -130,12 +138,41 @@ async def follow(ctx, username: str):
             raise error
 
 @bot.command(
+    description="UnFollow a user, only an owner of the server can do this command"
+)
+@commands.is_owner()
+@commands.cooldown(1, 10, commands.BucketType.user)
+async def unfollow(ctx, username: str):
+    try:
+        user = None
+        if username.isdigit():
+            user = bot.twitter.get_user(int(username))
+
+        else:
+            user = bot.twitter.get_user_by_username(username)
+
+        user.unfollow()
+        await ctx.send(f"{bot.twitter.user.username} Has unfollowed {user.username}!")
+
+    except Exception as error:
+        if isinstance(error, pytweet.errors.NotFoundError):
+            await ctx.send(f"Could not find user with username(or id): [{username}].")
+            
+        else:
+            raise error
+
+@bot.command(
     description="Return users that i followed"
 )
 @commands.is_owner()
-@commands.cooldown(1, 5, commands.BucketType.user)
+@commands.cooldown(1, 10, commands.BucketType.user)
 async def following(ctx):
-    await ctx.send("This command is still in renovation")
+    users=bot.twitter.user.following
+    txt=""
+    for num, user in enumerate(users):
+        txt += f"{num + 1}. {user.username}({user.id})\n"
+    
+    await ctx.send(f"Here are **{len(users)}** cool people i followed!\n{txt}")
 
 token = os.environ["token"]
 bot.run(token)

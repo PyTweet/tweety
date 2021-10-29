@@ -1,0 +1,7 @@
+language="python3"
+run="pip install git+https://github.com/TheFarGG/PyTweet"
+onBoot="echo Booting up!"
+
+[packager]
+ignoredPaths=[".git"]
+ignoredPackages=["discord.py", "discord"]

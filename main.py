@@ -1,23 +1,14 @@
 import os
 import discord
 import pytweet
+from bot import DisTweetBot
 from helpcommand import CustomHelpCommand
 from discord.ext import commands
 
 # pip install git+https://github.com/Pycord-Development/pycord
 # pip install git+https://github.com/TheFarGG/PyTweet
 
-
-bot = commands.Bot(
-    command_prefix=commands.when_mentioned_or("e!"),
-    help_command=CustomHelpCommand(),
-    intents=discord.Intents.all(),
-    owner_id=685082846993317953,
-    status=discord.Status.idle,
-    activity=discord.Activity(type=discord.ActivityType.competing, name="A Battle"),
-)
-
-bot.twitter = pytweet.Client(
+twitterbot = pytweet.Client(
     os.environ["bearer_token"],
     consumer_key=os.environ["api_key"],
     consumer_key_secret=os.environ["api_key_secret"],
@@ -25,29 +16,17 @@ bot.twitter = pytweet.Client(
     access_token_secret=os.environ["access_token_secret"],
 )
 
-@bot.event
-async def on_ready():
-    print(f"In online as {bot.twitter.user.username} - {bot.twitter.user.id}")
-
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandInvokeError):
-        err=error.original
-        if isinstance(err, pytweet.errors.TooManyRequests):
-            await ctx.send("Runtime Error. Return code: 429. Rate limit exceeded!")
-
-        else:
-            raise error
-
-    elif isinstance(error, commands.CommandOnCooldown):
-        await ctx.send(f"Im on cooldown! Please wait {error.retry_after:.2f} seconds")
-
-    elif isinstance(error, commands.NotOwner):
-        await ctx.send(f"Only owner can do that command sus")
-        ctx.command.reset_cooldown(ctx)
-
-    else:
-        raise error
+bot = DisTweetBot(
+    twitterbot,
+    command_prefix=commands.when_mentioned_or("e!"),
+    help_command=CustomHelpCommand(),
+    intents=discord.Intents.all(),
+    case_insensitive=True,
+    strip_after_prefix=True,
+    owner_id=685082846993317953,
+    status=discord.Status.idle,
+    activity=discord.Activity(type=discord.ActivityType.competing, name="A Battle"),
+)
 
 @bot.command(description="Get the bot's ping")
 async def ping(ctx):
@@ -57,7 +36,14 @@ async def ping(ctx):
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def user(ctx, username: str):
     try:
-        user = bot.twitter.get_user_by_username(username)
+        user=None
+
+        if username.isdigit():
+            user=bot.twitter.get_user(username)
+        
+        else:
+            user = bot.twitter.get_user_by_username(username)
+            
         await ctx.send(
             embed=discord.Embed(
                 title=user.name,
@@ -164,7 +150,6 @@ async def unfollow(ctx, username: str):
 @bot.command(
     description="Return users that i followed"
 )
-@commands.is_owner()
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def following(ctx):
     users=bot.twitter.user.following
@@ -174,5 +159,10 @@ async def following(ctx):
     
     await ctx.send(f"Here are **{len(users)}** cool people i followed!\n{txt}")
 
+os.environ['JISHAKU_NO_UNDERSCORE'] = 'True'
+os.environ['JISHAKU_RETAIN'] = 'True'
+os.environ['JISHAKU_FORCE_PAGINATOR'] = 'True'
+
+bot.load_extension('jishaku')
 token = os.environ["token"]
 bot.run(token)

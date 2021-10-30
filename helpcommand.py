@@ -4,7 +4,7 @@ from discord.ext import commands
 
 class CustomHelpCommand(commands.HelpCommand):
     async def send_bot_help(self, mapping):
-        cmd = [cmd for cog, cmd in mapping.items()]
+        cmd = [cmd for cog, cmd in mapping.items() if cog == None]
         em = discord.Embed(
             title="HelpCommand",
             description=f"Hello there, my name in Tweety. I'm a discord bot made using Discord.py and pytweet for twitter commands related. You can make bot with twitter functions like me using [pytweet](https://pypi.org/project/PyTweet/).\n\nList Command: {', '.join([command.qualified_name for command in cmd[0]])}",

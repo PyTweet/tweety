@@ -22,8 +22,9 @@ class DisTweetBot(commands.Bot):
             try:
                 if not fn == "__pycache__":
                     self.load_extension(f"cogs.{fn[:-3]}")
-            except:
+            except Exception as e:
                 print(f"Cannot load extension: {fn}")
+                raise e
 
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError):
@@ -36,6 +37,8 @@ class DisTweetBot(commands.Bot):
 
             else:
                 await ctx.send(f"Oh no! An error has occured!\n{error}")
+                raise error
+
 
         elif isinstance(error, commands.CommandOnCooldown):
             await ctx.send(f"Im on cooldown! Please wait {error.retry_after:.2f} seconds")

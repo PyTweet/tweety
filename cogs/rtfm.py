@@ -180,4 +180,4 @@ class RTFM(commands.Cog):
 
 
 def setup(bot):
-  bot.add_cog(RTFM(bot))
+    bot.add_cog(RTFM(bot))

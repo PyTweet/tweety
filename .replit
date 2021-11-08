@@ -1,7 +1,13 @@
 language="python3"
-run="pip install git+https://github.com/TheFarGG/PyTweet"
+run = """
+pip install git+https://github.com/Pycord-Development/pycord
+pip install git+https://github.com/TheFarGG/PyTweet
+pip install git+https://github.com/Gorialis/jishaku
+python3 main.py
+"""
 onBoot="echo Booting up!"
 
 [packager]
+afterInstall="pip install git+https://github.com/Pycord-Development/pycord"
 ignoredPaths=[".git"]
 ignoredPackages=["discord.py", "discord"]

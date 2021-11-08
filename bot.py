@@ -20,7 +20,8 @@ class DisTweetBot(commands.Bot):
 
         for fn in os.listdir('cogs'):
             try:
-                self.load_extension(f"cogs.{fn[:-3]}")
+                if not fn == "__pycache__":
+                    self.load_extension(f"cogs.{fn[:-3]}")
             except:
                 print(f"Cannot load extension: {fn}")
 

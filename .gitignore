@@ -2,3 +2,4 @@
 *pyproject.toml
 *.breakpoints
 *__pycache__
+cogs/owner.py

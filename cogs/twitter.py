@@ -205,13 +205,25 @@ class Twitter(commands.Cog):
 
     @commands.command("post", description="Post a tweet to twitter! only owner of the bot can do this!")
     @commands.is_owner()
-    async def postTweet(self, ctx, *, text):
+    async def postTweet(self, ctx, flag: str, *, text=None):
         tweet=None
         try:
-            tweet=self.bot.twitter.tweet(text)
-            await ctx.send(f"Posted! check it on {tweet.link}")
-        except pytweet.Forbidden:
-            await ctx.send(f"Posted! check it on {tweet.link}")
+            if flag in ("-random", "-ran", "-r"):
+                word = self.bot.get_ranword()
+                tweet = self.bot.twitter.tweet(f"{word.response}\nMade with https://docs.api.breadbot.me/reference/api-reference/sentence-generator")
+                await ctx.send(f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}")
+
+            elif flag in ("-", "-none", "-None", "--"):
+                tweet=self.bot.twitter.tweet(text)
+                await ctx.send(f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}")
+
+        except Exception as e:
+            if isinstance(e, pytweet.Forbidden):
+                await ctx.send(f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}")
+                await ctx.send(f"API has a weird error coming byL {e}")
+
+            else:
+                raise e
 
 def setup(bot: commands.Bot):
     bot.add_cog(Twitter(bot))

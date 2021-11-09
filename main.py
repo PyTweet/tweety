@@ -24,9 +24,9 @@ bot = DisTweetBot(
     intents=discord.Intents.all(),
     case_insensitive=True,
     strip_after_prefix=True,
-    owner_id=685082846993317953,
     status=discord.Status.idle,
     activity=discord.Game(name="Follow me on twitter at @TweetyBott!"),
+    owner_ids = [685082846993317953, 739443421202087966]
 )
 
 @bot.command(description="Get the bot's ping")

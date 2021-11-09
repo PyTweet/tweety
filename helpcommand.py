@@ -4,10 +4,15 @@ from discord.ext import commands
 
 class CustomHelpCommand(commands.HelpCommand):
     async def send_bot_help(self, mapping):
-        cmd = [cmd for cog, cmd in mapping.items() if cog == None]
+        commands=""
+        for cog, list_commands in mapping.items():
+            for cmd in list_commands:
+                if cmd.qualified_name != "jishaku":
+                    commands += f" {cmd.qualified_name},"
+
         em = discord.Embed(
             title="HelpCommand",
-            description=f"Hello there, my name in Tweety. I'm a discord bot made using Discord.py and pytweet for twitter commands related. You can make bot with twitter functions like me using [pytweet](https://pypi.org/project/PyTweet/).\n\nList Command: {', '.join([command.qualified_name for command in cmd[0]])}",
+            description=f"Hello there, my name in Tweety. I'm a discord bot made using Discord.py and pytweet for twitter commands related. You can make bot with twitter functions like me using [pytweet](https://pypi.org/project/PyTweet/).\n\nList Command: {commands}",
             color=discord.Color.blue(),
         ).set_footer(text="You can use e!help <command> for more info about a command")
 

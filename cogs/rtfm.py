@@ -1,12 +1,9 @@
-from discord.ext import commands
-import asyncio
-import datetime
 import discord
 import re
 import zlib
 import io
 import os
-
+from discord.ext import commands
 
 def finder(text, collection, *, key=None, lazy=True):
     suggestions = []

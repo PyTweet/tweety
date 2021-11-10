@@ -3,13 +3,20 @@ import pytweet
 from discord.ext import commands
 from typing import Union
 
+def is_developer():
+    def predicate(ctx):
+        if ctx.author.id in ctx.bot.dev_ids or ctx.author.id in ctx.bot.owner_ids:
+           return True
+        return False
+    return commands.check(predicate)
+
 class Twitter(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
     @commands.command('user', description="A command for user lookup")
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def userLookup(self, ctx, username: Union[str, int]):
+    async def userLookup(self, ctx: commands.Context, username: Union[str, int]):
         try:
             user=None
 
@@ -22,7 +29,7 @@ class Twitter(commands.Cog):
                 embed=discord.Embed(
                     title=user.name,
                     url=user.profile_link,
-                    description=f":link: {user.link if len(user.link) > 0 else '*This user doesnt provide link*'} | <:compas:879722735377469461> {user.location}\n{user.bio if len(user.bio) > 0 else '*User doesnt provide a bio*'}",
+                    description=f":link: {user.link if len(user.link) > 0 else '*This user doesnt provide link*'} • <:compas:879722735377469461> {user.location}\n\n{user.bio if len(user.bio) > 0 else '*User doesnt provide a bio*'}",
                     color=discord.Color.blue(),
                 )
                 .set_author(
@@ -57,7 +64,7 @@ class Twitter(commands.Cog):
 
     @commands.command('tweet', description="A command for tweet lookup")
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def tweetLookup(self, ctx, tweet_id: int):
+    async def tweetLookup(self, ctx: commands.Context, tweet_id: int):
         try:
             tweet = self.bot.twitter.fetch_tweet(tweet_id)
             user = tweet.author
@@ -107,7 +114,7 @@ class Twitter(commands.Cog):
     
     @commands.command('poll', description="See a tweet's poll")
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def poll(self, ctx, tweet_id: int):
+    async def poll(self, ctx: commands.Context, tweet_id: int):
         try:
             tweet = self.bot.twitter.fetch_tweet(tweet_id)
             user = tweet.author
@@ -135,9 +142,9 @@ class Twitter(commands.Cog):
             await ctx.send("Tweet not found!")
 
     @commands.command("follow",description="Follow a user, only the bot owners can do this")
-    @commands.is_owner()
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def followUser(self, ctx, username: str):
+    @is_developer()
+    async def followUser(self, ctx: commands.Context, username: str):
         try:
             user = None
             me = self.bot.twitter.user
@@ -157,9 +164,9 @@ class Twitter(commands.Cog):
                 raise error
 
     @commands.command("unfollow", description="UnFollow a user, only the bot owners can do this")
-    @commands.is_owner()
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def unfollowUser(self, ctx, username: str):
+    @is_developer()
+    async def unfollowUser(self, ctx: commands.Context, username: str):
         try:
             user = None
             me = self.bot.twitter.user
@@ -181,6 +188,7 @@ class Twitter(commands.Cog):
 
     @commands.command("following", description="Return users that i followed")
     @commands.cooldown(1, 10, commands.BucketType.user)
+    @is_developer()
     async def Clientfollowing(self, ctx):
         users=self.bot.twitter.user.following
         txt=""
@@ -192,7 +200,8 @@ class Twitter(commands.Cog):
     @commands.command("send", description="Send a message to a user, only owner of the bot can do this!")
     @commands.is_owner()
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def sendMessagetoUser(self, ctx, username: Union[str, int], *, text: str):
+    @is_developer()
+    async def sendMessagetoUser(self, ctx: commands.Context, username: Union[str, int], *, text: str):
         user = None
         if username.isdigit():
             user = self.bot.twitter.fetch_user(int(username))
@@ -204,23 +213,40 @@ class Twitter(commands.Cog):
         await ctx.send(f"Send message to {user.username}")
 
     @commands.command("post", description="Post a tweet to twitter! only owner of the bot can do this!")
-    @commands.is_owner()
-    async def postTweet(self, ctx, flag: str, *, text=None):
+    @is_developer()
+    async def postTweet(self, ctx: commands.Context, flag: str, *, text=None):
         tweet=None
         try:
-            if flag in ("-random", "-ran", "-r"):
+            if flag.lower() in ("-random", "-ran", "-r"):
                 word = self.bot.get_ranword()
                 tweet = self.bot.twitter.tweet(f"{word.response}\nMade with https://docs.api.breadbot.me/reference/api-reference/sentence-generator")
                 await ctx.send(f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}")
 
-            elif flag in ("-", "-none", "-None", "--"):
+            elif flag.lower() in ("-reply", "-re", "-rep"):
+                text=text.split(" ")
+                tweet_id = text[0]
+                msg = ''
+                for word in text[1:]:
+                    if word != text[-1]:
+                        msg += f"{word} "
+                    else: 
+                        msg += word
+
+                tweet=self.bot.twitter.fetch_tweet(int(tweet_id))
+                tweet.reply(msg)
+                await ctx.send(f"Reply complete! check it on https://twitter.com/TweetyBott/status/{tweet.id}")
+
+            elif flag.lower() in ("-", "-none", "-None", "--"):
                 tweet=self.bot.twitter.tweet(text)
                 await ctx.send(f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}")
+
+            else:
+                await ctx.send(f"Unknown flags: {flag}")
 
         except Exception as e:
             if isinstance(e, pytweet.Forbidden):
                 await ctx.send(f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}")
-                await ctx.send(f"API has a weird error coming byL {e}")
+                await ctx.send(f"Also it return this:\n{e}")
 
             else:
                 raise e

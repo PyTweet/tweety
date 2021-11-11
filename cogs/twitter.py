@@ -2,6 +2,7 @@ import discord
 import pytweet
 from discord.ext import commands
 from typing import Union
+from objects import PostFlag
 
 def is_developer():
     def predicate(ctx):

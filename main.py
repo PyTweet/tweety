@@ -47,3 +47,8 @@ os.environ['JISHAKU_FORCE_PAGINATOR'] = 'True'
 
 token = os.environ["token"]
 bot.run(token)
+
+
+
+
+

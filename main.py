@@ -50,14 +50,14 @@ bot = DisTweetBot(
     owner_ids = [685082846993317953, 739443421202087966],
     dev_ids = [685082846993317953, 739443421202087966] #Geno, Sen.
 )
-bot.db = db
 
 @bot.command(description="Get the bot's ping")
 async def ping(ctx: commands.Context):
     await ctx.send(f"PONG! `{round(bot.latency * 1000)}MS`")
 
 @bot.after_invoke
-async def set_original_tokens(ctx):
+async def after_invoke(ctx):
+    print(1)
     bot.twitter.http.access_token = os.environ["access_token"]
     bot.twitter.http.access_token_secret = os.environ["access_token_secret"] 
 

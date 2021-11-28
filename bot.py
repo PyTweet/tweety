@@ -2,6 +2,7 @@ import pytweet
 import os
 import bba
 import discord
+from replit import db
 from typing import Any, List, Optional
 from discord.ext import commands
 from webserver import keep_alive
@@ -13,8 +14,10 @@ class DisTweetBot(commands.Bot):
         self.twitter = tweetbot
         self.dev_ids: Optional[List[int]] = kwargs.get("dev_ids")
         self.bc: bba.Client = bba.Client(os.environ['BBA'])
+        self.db = db
+        self.__user_accounts_cache = {}
         
-    async def set_user_credentials(self, ctx: commands.Context):
+    def set_user_credentials(self, ctx: commands.Context):
         try:
             user = self.db[str(ctx.author.id)]
             token = user["token"]
@@ -22,8 +25,13 @@ class DisTweetBot(commands.Bot):
             self.twitter.http.access_token = token
             self.twitter.http.access_token_secret = token_secret
         except KeyError:
-            await ctx.send("Cannot post tweet, you are not login, Please use `e!login` command to register your account in my database!")
             return 0
+
+    def _set_account_user(self):
+        if not self.twitter.http.access_token:
+            return None
+
+        self._account_user = self.twitter.fetch_user(self.twitter.http.access_token.partition("-")[0])
     
     @property
     def session(self):
@@ -44,7 +52,7 @@ class DisTweetBot(commands.Bot):
 
     async def on_ready(self):
         keep_alive()
-        print(f"Logged In as {self.user} -- {self.user.id}")
+        print("loading cogs!")
         for fn in os.listdir('cogs'):
             try:
                 if not fn == "__pycache__":
@@ -52,6 +60,7 @@ class DisTweetBot(commands.Bot):
             except Exception as e:
                 print(f"Cannot load extension: {fn}")
                 raise e
+        print(f"Logged In as {self.user} -- {self.user.id}")
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if isinstance(error, commands.CommandInvokeError):
@@ -74,7 +83,6 @@ class DisTweetBot(commands.Bot):
             ctx.command.reset_cooldown(ctx)
 
         elif isinstance(error, commands.CheckFailure):
-            raise e
             await ctx.send(f"Check have failed! You are not in check")
 
         else:

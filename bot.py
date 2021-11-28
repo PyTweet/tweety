@@ -4,6 +4,7 @@ import bba
 import discord
 from typing import Any, List, Optional
 from discord.ext import commands
+from webserver import keep_alive
 
 class DisTweetBot(commands.Bot):
     def __init__(self, tweetbot: pytweet.Client, *args: Any, **kwargs: Any):
@@ -12,7 +13,18 @@ class DisTweetBot(commands.Bot):
         self.twitter = tweetbot
         self.dev_ids: Optional[List[int]] = kwargs.get("dev_ids")
         self.bc: bba.Client = bba.Client(os.environ['BBA'])
-
+        
+    async def set_user_credentials(self, ctx: commands.Context):
+        try:
+            user = self.db[str(ctx.author.id)]
+            token = user["token"]
+            token_secret = user["token_secret"]
+            self.twitter.http.access_token = token
+            self.twitter.http.access_token_secret = token_secret
+        except KeyError:
+            await ctx.send("Cannot post tweet, you are not login, Please use `e!login` command to register your account in my database!")
+            return 0
+    
     @property
     def session(self):
         return self.http._HTTPClient__session
@@ -31,6 +43,7 @@ class DisTweetBot(commands.Bot):
             await self.process_commands(after)
 
     async def on_ready(self):
+        keep_alive()
         print(f"Logged In as {self.user} -- {self.user.id}")
         for fn in os.listdir('cogs'):
             try:
@@ -61,6 +74,7 @@ class DisTweetBot(commands.Bot):
             ctx.command.reset_cooldown(ctx)
 
         elif isinstance(error, commands.CheckFailure):
+            raise e
             await ctx.send(f"Check have failed! You are not in check")
 
         else:

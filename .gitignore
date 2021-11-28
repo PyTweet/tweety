@@ -2,4 +2,7 @@
 *pyproject.toml
 *.breakpoints
 *__pycache__
+*.log
+*.out
+.replit
 cogs/owner.py

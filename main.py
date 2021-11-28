@@ -1,15 +1,16 @@
 import os
 import discord
 import pytweet
+from replit import db
 from bot import DisTweetBot
 from helpcommand import CustomHelpCommand
 from discord.ext import commands
 from discord.commands import Option
 import logging
 
-logging.getLogger('discord').setLevel(logging.DEBUG)
-logging.getLogger('discord.http').setLevel(logging.DEBUG)
-logging.getLogger('discord.state').setLevel(logging.DEBUG)
+logging.getLogger('discord').setLevel(logging.INFO)
+logging.getLogger('discord.http').setLevel(logging.WARNING)
+logging.getLogger('discord.state').setLevel(logging.INFO)
 
 
 logger = logging.getLogger()
@@ -45,19 +46,25 @@ bot = DisTweetBot(
     strip_after_prefix=True,
     status=discord.Status.idle,
     activity=discord.Game(name="Follow me on twitter at @TweetyBott!"),
-    allowed_mentions=discord.AllowedMentions(roles=False, everyone=False, users=True),
+    #allowed_mentions=discord.AllowedMentions(roles=False, everyone=False, users=True),
     owner_ids = [685082846993317953, 739443421202087966],
-    dev_ids = [685082846993317953, 907675082019733525, 859996173943177226,739443421202087966] #Geno, Far, Sen.
+    dev_ids = [685082846993317953, 739443421202087966] #Geno, Sen.
 )
+bot.db = db
 
 @bot.command(description="Get the bot's ping")
 async def ping(ctx: commands.Context):
     await ctx.send(f"PONG! `{round(bot.latency * 1000)}MS`")
 
+@bot.after_invoke
+async def set_original_tokens(ctx):
+    bot.twitter.http.access_token = os.environ["access_token"]
+    bot.twitter.http.access_token_secret = os.environ["access_token_secret"] 
+
 @bot.slash_command(description="Get the bot's ping",
  guild_ids=[858312394236624957]
 )
-async def ping(ctx):
+async def _ping(ctx):
     await ctx.respond(f"PONG! `{round(bot.latency * 1000)}MS`")
 
 
@@ -66,6 +73,7 @@ async def ping(ctx):
 async def hello(ctx, name: Option(str, "The name that you want to greet")):
     name = name or ctx.author.name
     await ctx.respond(f"Hello {name}!")
+
 
 token = os.environ["token"]
 bot.run(token)

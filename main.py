@@ -54,12 +54,6 @@ bot = DisTweetBot(
 async def ping(ctx: commands.Context):
     await ctx.send(f"PONG! `{round(bot.latency * 1000)}MS`")
 
-@bot.after_invoke
-async def after_invoke(ctx):
-    print(1)
-    bot.twitter.http.access_token = os.environ["access_token"]
-    bot.twitter.http.access_token_secret = os.environ["access_token_secret"] 
-
 @bot.slash_command(name="ping", description="Get the bot's ping",
  guild_ids=[858312394236624957]
 )
@@ -76,8 +70,3 @@ async def hello(ctx, name: Option(str, "The name that you want to greet")):
 
 token = os.environ["token"]
 bot.run(token)
-
-
-
-
-

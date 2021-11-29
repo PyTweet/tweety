@@ -26,6 +26,24 @@ class Account(TwitterUser):
         return self.twitter_credentials.get("token_secret", None)
 
     @property
+    def screen_name(self):
+        try:
+            return self.twitter_credentials.get("screen_name", None).replace("@", "")
+        except Exception:
+            return self.twitter_credentials.get("screen_name", None)
+
+    @property
+    def user_id(self):
+        try:
+            return int(self.twitter_credentials.get("user_id", None))
+        except ValueError as e:
+            raise e
+
+    @property
+    def screen_name_mention(self):
+        return self.twitter_credentials.get("screen_name", None)
+
+    @property
     def user(self):
         return self.client.account
 

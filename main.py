@@ -1,7 +1,6 @@
 import os
 import discord
 import pytweet
-from replit import db
 from bot import DisTweetBot
 from helpcommand import CustomHelpCommand
 from discord.ext import commands
@@ -61,7 +60,7 @@ async def after_invoke(ctx):
     bot.twitter.http.access_token = os.environ["access_token"]
     bot.twitter.http.access_token_secret = os.environ["access_token_secret"] 
 
-@bot.slash_command(description="Get the bot's ping",
+@bot.slash_command(name="ping", description="Get the bot's ping",
  guild_ids=[858312394236624957]
 )
 async def _ping(ctx):

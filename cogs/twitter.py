@@ -18,19 +18,26 @@ class Twitter(commands.Cog):
     @commands.command("login", description="Create a set of user access token so you can use twitter related commands in with your account!")
     async def LogIn(self, ctx: commands.Context):
         self.bot.twitter.http.access_token = os.environ["access_token"]
-        self.bot.twitter.http.access_token_secret = os.environ["access_token_secret"] 
+        self.bot.twitter.http.access_token_secret = os.environ["access_token_secret"] #To be sure its TweetyBott
         try:
             self.bot.db[str(ctx.author.id)]
         except KeyError:
             pass
         else:
-            await ctx.send("You already login!")
-            return
+            try:
+                db = self.bot.db[str(ctx.author.id)]
+                await ctx.send(f"You are were already logged in as: `{db['screen_name']}` with id `{db['user_id']}`")
+                return
+            except KeyError:
+                user = await self.bot.get_user(ctx.author.id, ctx)
+                await ctx.send(f"You are were already logged in as: `{user.twitter_account.account.username}` with id `{user.twitter_account.account.id}`")
+                db = self.bot.db[str(ctx.author.id)]
+                db["screen_name"] = user.twitter_account.account.username
+                db["user_id"] = user.twitter_account.account.id
+                return
 
         oauth = pytweet.OauthSession.with_oauth_flow(self.bot.twitter)
         await ctx.send("Follow my instruction to register your account to my database!\n1. I will send a url to your dm, click it.\n2. after that you have to authorize TweetyBott application, then you will get redirect to `https://twitter.com`, the url contain an access token & secret.\n3. Copy the website url and send it to my dm.")
-        print(self.bot.twitter.http.access_token)
-        print(self.bot.twitter.http.access_token_secret)
         link = oauth.generate_oauth_url("direct_messages")
         await ctx.author.send(f"**Step 1 & 2**\nClick & Authorize TweetBott in this url --> {link}")
         
@@ -55,18 +62,13 @@ class Twitter(commands.Cog):
         user_id_credential, user_id = user_id.split("=")
         screen_name_credential, screen_name = screen_name.split("=")
 
-        data = {"token": oauth_token, "token_secret": oauth_secret}
+        data = {"token": oauth_token, "token_secret": oauth_secret, "screen_name": "@" + screen_name, "user_id": user_id}
         self.bot.db[str(ctx.author.id)] = data
         await ctx.author.send(f"Done, You are logged as `{screen_name}` with id `{user_id}`")
         await ctx.send(f"{ctx.author.mention} --- Now you can use twitter related commands, please check `e!help` for twitter related commands or you can start with `e!post - Post test from @TweetBott`. Note that if you want to declined my connection, you can revoke it by going to <https://twitter.com/settings/apps_and_sessions>. **Note that you CANNOT use twitter related command anymore after this!**")
 
     @commands.command("logout", description="Logout from your current twitter account, mean the data in my database will get delete and will be invalid!")
     async def LogOut(self, ctx: commands.Context):
-        error_code = self.bot.set_user_credentials(ctx)
-        if error_code == 0:
-            await ctx.send("Cannot do interaction, you are not login, Please use `e!login` command to register your account in my database!")
-            return
-
         yes = discord.ui.Button(label="Yes", style=discord.ButtonStyle.green)
         no = discord.ui.Button(label="NO", style=discord.ButtonStyle.red)
 
@@ -192,10 +194,17 @@ class Twitter(commands.Cog):
     async def Clientfollowing(self, ctx: commands.Context):
         txt=""
         client = await self.bot.get_user(ctx.author.id, ctx)
-        
-        users = client.twitter_account.account.fetch_following()
-        for num, user in enumerate(users):
-            txt += f"{num + 1}. {user.username}({user.id})\n"
+        try:
+            users = client.twitter_account.account.fetch_following()
+            if not users:
+                await ctx.send("Your havent followed anyone!")
+                return
+            
+            for num, user in enumerate(users):
+                txt += f"{num + 1}. {user.username}({user.id})\n"
+        except TypeError:
+            await ctx.send(f"{client.twitter_account.account.username} Your havent followed anyone!")
+            return
             
         await ctx.send(f"Here are **{len(users)}** cool people you followed!\n```yaml\n{txt}```")
 
@@ -207,10 +216,10 @@ class Twitter(commands.Cog):
             user = None
             me = client.twitter_account.account
             if username.isdigit():
-                user = client.fetch_user(int(username))
+                user = client.twitter_account.client.fetch_user(int(username))
 
             else:
-                user = client.fetch_user_by_name(username)
+                user = client.twitter_account.client.fetch_user_by_name(username)
 
             user.follow()
             await ctx.send(f"{me.username} Has followed {user.username}!")
@@ -230,10 +239,10 @@ class Twitter(commands.Cog):
             user = None
             me = client.twitter_account.account
             if username.isdigit():
-                user = client.fetch_user(int(username))
+                user = client.twitter_account.client.fetch_user(int(username))
 
             else:
-                user = client.fetch_user_by_name(username)
+                user = client.twitter_account.client.fetch_user_by_name(username)
 
             user.unfollow()
             await ctx.send(f"{me.username} Has unfollowed {user.username}!")
@@ -253,10 +262,10 @@ class Twitter(commands.Cog):
         client = await self.bot.get_user(ctx.author.id, ctx)
 
         if username.isdigit():
-            user = client.fetch_user(int(username))
+            user = client.twitter_account.client.fetch_user(int(username))
 
         else:
-            user = client.fetch_user_by_name(username)
+            user = client.twitter_account.client.fetch_user_by_name(username)
 
         user.send(text)
         await ctx.send(f"Send message to {user.username}")
@@ -305,7 +314,7 @@ class Twitter(commands.Cog):
             elif isinstance(e, pytweet.Unauthorized):
                 await ctx.send("You have declined your APP Session! Tweety can no longer do action on behalf of you!")
 
-            elif isinstance(e, discord.UserNotFound):
+            elif isinstance(e, commands.UserNotFound):
                 pass
 
             else:

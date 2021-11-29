@@ -2,6 +2,7 @@ import pytweet
 import os
 import bba
 import discord
+import asyncio
 from replit import db
 from typing import Any, List, Optional
 from discord import User
@@ -29,12 +30,6 @@ class DisTweetBot(commands.Bot):
         except KeyError:
             return 0
 
-    def _set_account_user(self):
-        if not self.twitter.http.access_token:
-            return None
-
-        self._account_user = self.twitter.fetch_user(self.twitter.http.access_token.partition("-")[0])
-
     async def get_user(self, id: int, ctx: commands.Context) -> Optional[User]:
         user = self._connection.get_user(id)
         try:
@@ -42,7 +37,14 @@ class DisTweetBot(commands.Bot):
         except (ValueError, TypeError, KeyError) as e:
             raise e
         else:
-            account = Account(self, self.twitter, twitter_credential)
+            twitterclient = pytweet.Client(
+                os.environ["bearer_token"],
+                consumer_key=os.environ["api_key"],
+                consumer_key_secret=os.environ["api_key_secret"],
+                access_token=twitter_credential["token"],
+                access_token_secret=twitter_credential["token_secret"],
+            )
+            account = Account(self, twitterclient, twitter_credential)
             user = TwitterUser(user, account)
             if not user:
                 raise discord.UserNotFound(id)
@@ -80,16 +82,20 @@ class DisTweetBot(commands.Bot):
             except Exception as e:
                 print(f"Cannot load extension: {fn}")
                 raise e
+                
         print(f"Logged In as {self.user} -- {self.user.id}")
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if isinstance(error, commands.CommandInvokeError):
-            err=error.original
-            if isinstance(err, pytweet.errors.TooManyRequests):
+            og_error=error.original
+            if isinstance(og_error, pytweet.errors.TooManyRequests):
                 await ctx.send("Runtime Error. Return code: 429. Rate limit exceeded!")
 
-            elif isinstance(err, commands.CommandOnCooldown):
+            elif isinstance(og_error, commands.CommandOnCooldown):
                 await ctx.message.add_reaction("⏳")
+
+            elif isinstance(og_error, asyncio.TimeoutError):
+                await ctx.author.send("You took too long to respond! aborting...")
 
             else:
                 await ctx.send(error)

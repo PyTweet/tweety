@@ -4,8 +4,10 @@ import bba
 import discord
 from replit import db
 from typing import Any, List, Optional
+from discord import User
 from discord.ext import commands
 from webserver import keep_alive
+from twitter import TwitterUser, Account
 
 class DisTweetBot(commands.Bot):
     def __init__(self, tweetbot: pytweet.Client, *args: Any, **kwargs: Any):
@@ -32,6 +34,24 @@ class DisTweetBot(commands.Bot):
             return None
 
         self._account_user = self.twitter.fetch_user(self.twitter.http.access_token.partition("-")[0])
+
+    async def get_user(self, id: int, ctx: commands.Context) -> Optional[User]:
+        user = self._connection.get_user(id)
+        try:
+            twitter_credential = self.db[str(id)]
+        except (ValueError, TypeError, KeyError) as e:
+            raise e
+        else:
+            account = Account(self, self.twitter, twitter_credential)
+            user = TwitterUser(user, account)
+            if not user:
+                raise discord.UserNotFound(id)
+
+            if not user.registered:
+                await ctx.send("This command require you to login using `e!login` command!")
+                return
+                
+            return user
     
     @property
     def session(self):
@@ -72,7 +92,7 @@ class DisTweetBot(commands.Bot):
                 await ctx.message.add_reaction("⏳")
 
             else:
-                await ctx.send(f"Oh no! An error has occured!\n{error}")
+                await ctx.send(error)
                 raise error
 
         elif isinstance(error, commands.CommandOnCooldown):

@@ -9,6 +9,7 @@ from discord import User
 from discord.ext import commands
 from webserver import keep_alive
 from twitter import TwitterUser, Account
+from objects import DisplayModels
 
 class DisTweetBot(commands.Bot):
     def __init__(self, tweetbot: pytweet.Client, *args: Any, **kwargs: Any):
@@ -18,24 +19,17 @@ class DisTweetBot(commands.Bot):
         self.dev_ids: Optional[List[int]] = kwargs.get("dev_ids")
         self.bc: bba.Client = bba.Client(os.environ['BBA'])
         self.db = db
-        self.__user_accounts_cache = {}
-        
-    def set_user_credentials(self, ctx: commands.Context):
-        try:
-            user = self.db[str(ctx.author.id)]
-            token = user["token"]
-            token_secret = user["token_secret"]
-            self.twitter.http.access_token = token
-            self.twitter.http.access_token_secret = token_secret
-        except KeyError:
-            return 0
+        self.displayer = DisplayModels()
+        self.__user_accounts_cache__ = {}
 
     async def get_user(self, id: int, ctx: commands.Context) -> Optional[User]:
         user = self._connection.get_user(id)
         try:
             twitter_credential = self.db[str(id)]
-        except (ValueError, TypeError, KeyError) as e:
-            raise e
+        except (ValueError, TypeError, KeyError):
+            await ctx.send("This command require you to login using `e!login` command!")
+            return 0
+
         else:
             twitterclient = pytweet.Client(
                 os.environ["bearer_token"],
@@ -45,15 +39,12 @@ class DisTweetBot(commands.Bot):
                 access_token_secret=twitter_credential["token_secret"],
             )
             account = Account(self, twitterclient, twitter_credential)
-            user = TwitterUser(user, account)
+            Twitteruser = TwitterUser(user, account)
             if not user:
-                raise discord.UserNotFound(id)
-
-            if not user.registered:
                 await ctx.send("This command require you to login using `e!login` command!")
-                return
+                return 0
                 
-            return user
+            return Twitteruser
     
     @property
     def session(self):
@@ -69,7 +60,7 @@ class DisTweetBot(commands.Bot):
         return self.bc.calc(expression, variable)
 
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        if after.author.id in self.owner_ids or before.author.id in self.owner_ids:
+        if after.author.id in self.owner_ids or before.author.id in self.owner_ids and not any(after.author.bot, before.author.bot):
             await self.process_commands(after)
 
     async def on_ready(self):
@@ -97,8 +88,18 @@ class DisTweetBot(commands.Bot):
             elif isinstance(og_error, asyncio.TimeoutError):
                 await ctx.author.send("You took too long to respond! aborting...")
 
+            elif isinstance(og_error, discord.HTTPException):
+                pass
+            
+            elif isinstance(og_error, discord.HTTPException):
+                pass
+
+            elif isinstance(og_error, pytweet.BadRequests):
+                await ctx.send("BadArgument! Arguments that you passed is violating twitter's api rules, Please send a correct argument next time!")
+                return
+
             else:
-                await ctx.send(error)
+                await ctx.send(og_error)
                 raise error
 
         elif isinstance(error, commands.CommandOnCooldown):
@@ -110,6 +111,9 @@ class DisTweetBot(commands.Bot):
 
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(f"Check have failed! You are not in check")
+
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(error)
 
         else:
             try:

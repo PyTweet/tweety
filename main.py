@@ -1,18 +1,18 @@
 import os
 import discord
 import pytweet
+import logging
+
 from bot import DisTweetBot
 from helpcommand import CustomHelpCommand
 from discord.ext import commands
 from discord.commands import Option
-import logging
 
 logging.getLogger('discord').setLevel(logging.INFO)
 logging.getLogger('discord.http').setLevel(logging.WARNING)
 logging.getLogger('discord.state').setLevel(logging.INFO)
-
-
 logger = logging.getLogger()
+
 logger.setLevel(logging.INFO)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='a')
 fmt = logging.Formatter('[{asctime}] [{levelname:<7}] {name}: {message}',"%Y-%m-%d %H:%M:%S", style='{')
@@ -45,23 +45,40 @@ bot = DisTweetBot(
     strip_after_prefix=True,
     status=discord.Status.idle,
     activity=discord.Game(name="Follow me on twitter at @TweetyBott!"),
-    #allowed_mentions=discord.AllowedMentions(roles=False, everyone=False, users=True),
+    allowed_mentions=discord.AllowedMentions(roles=False, everyone=False, users=True),
     owner_ids = [685082846993317953, 739443421202087966],
     dev_ids = [685082846993317953, 739443421202087966] #Geno, Sen.
 )
+
+@bot.before_invoke
+async def before_invoke(ctx: commands.Context):
+    try:
+        bot.db["bot"]["info"]["total_invoked_commands"] += 1
+    except KeyError:
+        bot.db["bot"] = {"info": {"total_invoked_commands": 50}}
 
 @bot.command(description="Get the bot's ping")
 async def ping(ctx: commands.Context):
     await ctx.send(f"PONG! `{round(bot.latency * 1000)}MS`")
 
+@bot.command("info", description="Get the bot info")
+async def BotInfo(ctx: commands.Context):
+    info = bot.db["bot"]["info"]
+    em=discord.Embed(
+        title="Bot Information",
+        description=f"I invoked **{info['total_invoked_commands']}** total commands with **{len(bot.commands)}** commands registered in my system, around **{len(bot.db.keys()) - 1}** users use me for their twitter account",
+        color=discord.Color.blue()
+    )
+    await ctx.send(embed=em)
+
+#Slash Commands
+
 @bot.slash_command(name="ping", description="Get the bot's ping",
  guild_ids=[858312394236624957]
 )
-async def _ping(ctx):
+async def _ping(ctx: commands.Context):
     await ctx.respond(f"PONG! `{round(bot.latency * 1000)}MS`")
 
-
-#Slash Commands
 @bot.slash_command(description="Say hello to me")
 async def hello(ctx, name: Option(str, "The name that you want to greet")):
     name = name or ctx.author.name

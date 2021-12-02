@@ -19,7 +19,7 @@ class DisTweetBot(commands.Bot):
         self.dev_ids: Optional[List[int]] = kwargs.get("dev_ids")
         self.bc: bba.Client = bba.Client(os.environ['BBA'])
         self.db = db
-        self.displayer = DisplayModels()
+        self.displayer = DisplayModels(self)
         self.__user_accounts_cache__ = {}
 
     async def get_user(self, id: int, ctx: commands.Context) -> Optional[User]:

@@ -46,8 +46,8 @@ bot = DisTweetBot(
     status=discord.Status.idle,
     activity=discord.Game(name="Follow me on twitter at @TweetyBott!"),
     allowed_mentions=discord.AllowedMentions(roles=False, everyone=False, users=True),
-    owner_ids = [685082846993317953, 739443421202087966],
-    dev_ids = [685082846993317953, 739443421202087966] #Geno, Sen.
+    owner_ids = [685082846993317953, 739443421202087966, 859996173943177226],
+    dev_ids = [685082846993317953, 739443421202087966, 859996173943177226] #Geno, Sen.
 )
 
 @bot.before_invoke
@@ -66,7 +66,7 @@ async def BotInfo(ctx: commands.Context):
     info = bot.db["bot"]["info"]
     em=discord.Embed(
         title="Bot Information",
-        description=f"I invoked **{info['total_invoked_commands']}** total commands with **{len(bot.commands)}** commands registered in my system, around **{len(bot.db.keys()) - 1}** users use me for their twitter account",
+        description=f"I invoked **{info['total_invoked_commands']}** total commands with **{len(bot.commands)}** commands registered in my system. A round **{round(len(bot.db.keys()) - 1)}** users logged into my database and I can see a total of **{round(len(bot.users))}** users across **{round(len(bot.guilds))}** guilds.",
         color=discord.Color.blue()
     )
     await ctx.send(embed=em)

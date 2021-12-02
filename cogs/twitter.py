@@ -1,11 +1,12 @@
 import discord
 import pytweet
 import os
-from discord import ButtonStyle
 from discord.ext import commands
 from typing import Union
 from views import Paginator
 from discord.ui import Button, View, Select
+
+
 
 def to_keycap(c):
     return '\N{KEYCAP TEN}' if c == 10 else str(c) + '\u20e3'
@@ -39,10 +40,10 @@ class Twitter(commands.Cog):
                 if not user:
                     return
 
-                await ctx.send(f"You are were already logged in as: `{user.twitter_account.account.username}` with id `{user.twitter_account.account.id}`")
+                await ctx.send(f"You are were already logged in as: `{user.twitter_account.username}` with id `{user.twitter_account.id}`")
                 db = self.bot.db[str(ctx.author.id)]
-                db["screen_name"] = user.twitter_account.account.username
-                db["user_id"] = user.twitter_account.account.id
+                db["screen_name"] = user.twitter_account.username
+                db["user_id"] = user.twitter_account.id
                 return
 
         oauth = pytweet.OauthSession.with_oauth_flow(self.bot.twitter)
@@ -105,96 +106,39 @@ class Twitter(commands.Cog):
     @commands.command('user', description="A command for user lookup, can be use by anyone!")
     @commands.cooldown(1, 15, commands.BucketType.user)
     async def userLookup(self, ctx: commands.Context, username: Union[str, int] = None):
-        try:
-            _tweets = []
-            async def callback(inter):
-                if inter.user.id != ctx.author.id:
-                    await inter.response.send_message("This is not for you", ephemeral = True)
-                    return
-
-                tweet_id = inter.data["values"][0]
-                await self.bot.displayer.display_tweet(_tweets[int(tweet_id)], user, inter)
-
-            async def timeout(content, **items):
-                if items.get("buttons"):
-                    for button in items.get("buttons"):
-                        button.disabled = True
-
-                if items.get("select"):
-                    items.get("select").disabled = True
-                    
-                await msg.edit(content=content, view = view)
+        client = (await self.bot.get_user(ctx.author.id, ctx)).twitter_account.client
+        if not client:
+            client = self.bot.twitter
 
 
-            if not username:
-                await self.clientAccount(ctx)
-                return
+        if not username:
+            await self.clientAccount(ctx)
+            return
 
-            if username.isdigit():
-                user=self.bot.twitter.fetch_user(username)
-            
-            else:
-                user = self.bot.twitter.fetch_user_by_name(username)
+        if username.isdigit():
+            user = client.fetch_user(username)
+        
+        else:
+            user = client.fetch_user_by_name(username)
 
-            if not user:
-                await ctx.send(f"Could not find username with username(or id): [{username}].")
-                return
+        if not user:
+            await ctx.send(f"Could not find username with username(or id): [{username}].")
+            return
 
-            options = []
-            keycaps = [to_keycap(x) for x in range(1,6)]
-            view = View()
-
-            buttons = [Button(label=f"{user.follower_count} Followers", emoji="🤗", style=ButtonStyle.blurple), Button(label=f"{user.following_count} Following", emoji="🤗", style=ButtonStyle.blurple), Button(label=f"{user.tweet_count} Tweets", emoji="<:retweet:914877560142299167>", style=ButtonStyle.blurple)]
-            tweets = user.fetch_timelines(max_results=5, exclude="replies,retweets")
-
-            for num, tweet in enumerate(tweets):
-                if user.protected:
-                    break
-
-                else:
-                    _tweets.append(tweet)
-                    options.append(discord.SelectOption(label=f"({tweet.created_at.strftime('%d/%m/%Y')}) {tweet.text[:25]}{'...' if len(tweet.text) > 25 else ''}", value=str(num), description="(click to see full result)" if len(tweet.text) > 25 else '', emoji=keycaps[num], default=False))
-
-            print(options)
-            select = Select(placeholder="User Is Protected!" if user.protected else "(Recent User Timelines)", options=options if options else [discord.SelectOption(label="???", value="None", description="Cannot fetch user timelines...\n User is protected!", default=False)])
-            select.callback = callback
-
-            for button in buttons:
-                view.add_item(button)
-            view.add_item(select)
-            
-            em = discord.Embed(
-                title=user.name,
-                url=user.profile_link,
-                description=f"{user.bio if len(user.bio) > 0 else '*User doesnt provide a bio*'}\n\n:link: {user.link if len(user.link) > 0 else '*This user doesnt provide a link*'} • <:compas:879722735377469461> {user.location if len(user.location) > 0 else '*This user doesnt provide a location*'}",
-                color=discord.Color.blue(),
-            ).set_author(
-                name=user.username + f"({user.id}) {'✅' if user.verified else ''}{'🔒' if user.protected else ''}",
-                icon_url=user.profile_url,
-                url=user.profile_link,
-            ).set_footer(
-                text=f"Created Time: {user.created_at.strftime('%d/%m/%Y')}",
-                icon_url=user.profile_url,
-            )
-
-            # view.on_timeout = timeout(f"{user.bio if len(user.bio) > 0 else '*User doesnt provide a bio*'}\n\n:link: {user.link if len(user.link) > 0 else '*This user doesnt provide a link*'} • <:compas:879722735377469461> {user.location if len(user.location) > 0 else '*This user doesnt provide a location*'}", buttons=buttons, select=select) 
-
-            msg = await ctx.send(
-                embed=em,
-                view = view
-            )
-        except Exception as e:
-            await ctx.send(e)
-            raise e
+        await self.bot.displayer.display_user(ctx, user)
 
     @commands.command('tweet', description="A command for tweet lookup, can be use by anyone!")
     @commands.cooldown(1, 15, commands.BucketType.user)
     async def tweetLookup(self, ctx: commands.Context, tweet_id: int = 1465231032760684548):
-        tweet = self.bot.twitter.fetch_tweet(tweet_id)
+        client = await self.bot.get_user(ctx.author.id, ctx)
+        if not client:
+            return
+
+        tweet = client.twitter_account.client.fetch_tweet(tweet_id)
         if not tweet:
             await ctx.send("That tweet id is not exist!")
 
-        await self.bot.displayer.display_tweet(tweet, tweet.author, ctx)
+        await self.bot.displayer.display_tweet(ctx, tweet, None)
 
     @commands.command("following", aliases=["followings"], description="Return users that you followed, can be use by anyone!")
     @commands.cooldown(1, 15, commands.BucketType.user)
@@ -204,7 +148,7 @@ class Twitter(commands.Cog):
             return
 
         paginator = commands.Paginator(prefix = "", suffix = "", max_size = 370)
-        user =  client.twitter_account.account
+        user =  client.twitter_account
         try:
             users = user.fetch_following()
             if not users:
@@ -240,7 +184,7 @@ class Twitter(commands.Cog):
 
         id = me.twitter_account.user_id
         if not id:
-            id = me.twitter_account.account.id
+            id = me.twitter_account.id
             self.bot.db[str(ctx.author.id)]["user_id"] = id #Store the id in the database if it was not in the database, this is use to avoid ratelimit!
 
         await self.userLookup(ctx, str(id))
@@ -253,7 +197,7 @@ class Twitter(commands.Cog):
             return
 
         paginator = commands.Paginator(prefix = "", suffix = "", max_size = 370)
-        user = client.twitter_account.account
+        user = client.twitter_account
         try:
             users = user.fetch_followers()
             if not users:
@@ -289,7 +233,7 @@ class Twitter(commands.Cog):
             return
 
         user = None
-        me = client.twitter_account.account
+        me = client.twitter_account
         if username.isdigit():
             user = client.twitter_account.client.fetch_user(int(username))
 
@@ -311,7 +255,7 @@ class Twitter(commands.Cog):
             return
 
         user = None
-        me = client.twitter_account.account
+        me = client.twitter_account
         if username.isdigit():
             user = client.twitter_account.client.fetch_user(int(username))
 

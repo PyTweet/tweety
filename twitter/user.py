@@ -8,8 +8,11 @@ class TwitterUser:
         self.twitter_account = account
 
     @property
-    def registered(self):
+    def registered(self) -> bool:
         return str(self.user.id) in list(self.twitter_account.discord_client.db.keys())
 
-    def is_registered(self):
+    def is_registered(self) -> bool:
         self.registered
+
+    def is_developer(self) -> bool:
+        self.twitter_account

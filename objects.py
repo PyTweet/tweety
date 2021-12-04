@@ -1,5 +1,6 @@
 import discord
-from replit import db
+import random
+import pytweet
 from discord import ButtonStyle
 from discord.ext import commands
 from discord.ui import View, Button, Select
@@ -10,28 +11,45 @@ from twitter import TwitterUser
 def to_keycap(c):
     return '\N{KEYCAP TEN}' if c == 10 else str(c) + '\u20e3'
 
-def format_mentioned(user):
-    if not len(user.bio) > 0:
+def format_mentioned(text):
+    if not len(text) > 0:
         return "*User doesnt provide a bio*"
     
-    original_split = user.bio.split(" ")
-    bio = user.bio.replace("@", "[@").replace("#", "[#")
+    original_split = text.split(" ")
+    bio = text.replace("@", "[@").replace("#", "[#").replace("PyTweet", "[PyTweet").replace("pytweet", "[pytweet")
     split_bio = bio.split(" ")
     complete = ""
     for num, word in enumerate(split_bio):
-        if "." in word:
+        before_word = ''
+        if "." in word and not "t.co" in word:
+            before_word += '.'
             word = word.replace(".", "")
 
         if "[" in word:
             if "#" in word:
-                complete += f" {word}](https://twitter.com/hashtag/{original_split[num].replace('#', '')}?src=hashtag_click)"
+                value = original_split[num].replace('#', '').replace('\n', '')
+                complete += f" {word}](https://twitter.com/hashtag/{value}?src=hashtag_click){before_word}"
             elif '@' in word:
-                complete += f" {word}](https://twitter.com/{original_split[num].replace('@', '').replace('.', '')})"
+                value = original_split[num].replace('@', '').replace('\n', '')
+                complete += f" {word}](https://twitter.com/{value}){before_word}"
+            elif 'PyTweet' in word or 'pytweet' in word: #;)
+                complete += f" {word}](https://github.com/PyTweet/PyTweet){before_word}"
                 
         else:
             complete += (" " + word)
         
-    return complete if len(complete) <= 4096 else user.bio
+    return complete if len(complete) <= 4096 else text
+
+def get_badges(ctx, user) -> str:
+    text = ""
+    badges=["✅ ", "🔒 ", "⚒️ "]
+    if user.verified:
+        text += badges[0]
+    if user.protected:
+        text += badges[1]
+    if user.id in ctx.bot.twitter_dev_ids:
+        text += badges[2]
+    return text
 
 class DisplayModels:
     def __init__(self, bot):
@@ -52,22 +70,51 @@ class DisplayModels:
                 button.disabled = True
 
             select.disabled = True 
-            await msg.edit(view = view)
+            if isinstance(message, discord.Interaction):
+                try:
+                    await message.edit_original_message(view = view)
+                except Exception as e:
+                    raise e
+            else:
+                try:
+                    await message.edit(view = view)
+                except Exception as e:
+                    raise e
 
         async def follow(inter):
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral = True)
                 return
 
-            if user.id == int(db[str(ctx.author.id)]["token"].split("-")[0]): #not all data have "user_id" key, we use the access token that include the id. 
+            if user.id == int(ctx.bot.db[str(ctx.author.id)]["token"].split("-")[0]): #not all data have "user_id" key, we use the access token that include the id. 
                 buttons[0].disabled = True
-                await msg.edit(view = view)
+                if isinstance(message, discord.Interaction):
+                    try:
+                        await message.edit_original_message(view = view)
+                    except Exception as e:
+                        raise e
+                else:
+                    try:
+                        await message.edit(view = view)
+                    except Exception as e:
+                        raise e
                 await ctx.send("You cannot follow yourself!")
                 return
         
             user.follow()
+            label = buttons[0].label.split(" ")
+            buttons[0].label = str(int(label[0]) + 1 ) + " " + label[1]
             buttons[0].disabled = True
-            await msg.edit(view = view)
+            if isinstance(message, discord.Interaction):
+                try:
+                    await message.edit_original_message(view = view)
+                except Exception as e:
+                    raise e
+            else:
+                try:
+                    await message.edit(view = view)
+                except Exception as e:
+                    raise e
             await inter.response.send_message(f"Followed {user.username}!", ephemeral = True)
 
         options = []
@@ -109,16 +156,16 @@ class DisplayModels:
         for button in buttons:
             view.add_item(button)
         view.add_item(select)
+        bio = format_mentioned(user.bio)
 
-        bio = format_mentioned(user)
-
+        badges = get_badges(ctx, user)
         em = discord.Embed(
-            title=user.name,
+            title=user.name + " " + badges,
             url=user.profile_link,
             description=f"{bio}\n\n:link: {user.link if len(user.link) > 0 else '*This user doesnt provide a link*'} • <:compas:879722735377469461> {user.location if len(user.location) > 0 else '*This user doesnt provide a location*'}",
             color=discord.Color.blue(),
         ).set_author(
-            name=user.username + f"({user.id}) {'✅' if user.verified else ''}{'🔒' if user.protected else ''}",
+            name=user.username + f"({user.id})",
             icon_url=user.profile_url,
             url=user.profile_link,
         ).set_footer(
@@ -128,7 +175,7 @@ class DisplayModels:
 
         view.on_timeout = timeout 
 
-        msg = await ctx.send(
+        message = await ctx.send(
             embed=em,
             view = view
         )
@@ -157,11 +204,19 @@ class DisplayModels:
 
             tweet.like()
             await inter.response.send_message(f"{client.twitter_account.username} Liked the tweet!", ephemeral=True)
+            label = buttons[0].label.split(" ")
+            buttons[0].label = str(int(label[0]) + 1 ) + " " + label[1]
             buttons[0].disabled = True
-            try:
-                await msg.edit(view = view)
-            except Exception:
-                return
+            if isinstance(message, discord.Interaction):
+                try:
+                    await message.edit_original_message(view = view)
+                except Exception as e:
+                    raise e
+            else:
+                try:
+                    await message.edit(view = view)
+                except Exception as e:
+                    raise e
 
         async def retweet(inter):
             if inter.user.id != ctx.author.id:
@@ -170,11 +225,19 @@ class DisplayModels:
 
             tweet.retweet()
             await inter.response.send_message(f"{client.twitter_account.username} retweeted the tweet!", ephemeral=True)
+            label = buttons[1].label.split(" ")
+            buttons[1].label = str(int(label[0]) + 1 ) + " " + label[1]
             buttons[1].disabled = True
-            try:
-                await msg.edit(view = view)
-            except Exception:
-                return
+            if isinstance(message, discord.Interaction):
+                try:
+                    await message.edit_original_message(view = view)
+                except Exception as e:
+                    raise e
+            else:
+                try:
+                    await message.edit(view = view)
+                except Exception as e:
+                    raise e
 
         async def reply(inter):
             if inter.user.id != ctx.author.id:
@@ -190,7 +253,44 @@ class DisplayModels:
             await inter.response.send_message(f"{user.username} replied to the tweet!", ephemeral=True)
             await ctx.send("Reply completed!")
 
-        callbacks = [like, retweet] #TODO add reply and fix reply callback.
+        async def images(inter):
+            if inter.user.id != ctx.author.id:
+                await inter.response.send_message("This is not for you", ephemeral = True)
+                return
+
+            if not medias:
+                await inter.response.send_message("No media available for this tweet!")
+                return
+
+            if len(medias) > 1:
+                embed = em.copy()
+                img = random.choice(medias)
+                embed.set_image(
+                    url=img.url if img.type == pytweet.MediaType.photo else img.preview_image_url
+                )
+                if isinstance(message, discord.Interaction):
+                    try:
+                        await message.edit_original_message(embed = embed)
+                    except Exception as e:
+                        raise e
+                else:
+                    try:
+                        await message.edit(embed = embed)
+                    except Exception as e:
+                        raise e
+                
+            else:
+                await inter.response.send_message("No more images available!", ephemeral=True)
+
+        async def timeout():
+            for button in buttons:
+                button.disabled = True
+
+            await message.edit(view = view)
+
+        
+
+        callbacks = [like, retweet, images] #TODO add reply and fix reply callback.
 
         if not ctx.channel.is_nsfw() and tweet.sensitive:
             await method.response.send_message("This tweet has a sensitive content and might end up as nsfw, gore, and disturbing content. Use this command in nsfw channel!", ephemeral = True) if isinstance(method, discord.Interaction) else await method.send("This tweet has a sensitive content and might end up as nsfw, gore, and other disturbing contents. Use this command in nsfw channel!", ephemeral = True) 
@@ -200,11 +300,13 @@ class DisplayModels:
             link = tweet.link
         except (TypeError, AttributeError):
             link = f"https://twitter.com/{user.username.replace('@', '', 1)}/status/{str(tweet.id)}"
-        
+
+        text = format_mentioned(tweet.text)
+        medias = tweet.media
         em=discord.Embed(
-            title=f"Posted by {user.name}",
+            title=user.name + " " + get_badges(ctx, user),
             url=link,
-            description=tweet.text,
+            description=text,
             color=discord.Color.blue() if not tweet.sensitive else discord.Color.red()
         ).set_author(
             name=user.username + f"({user.id})",
@@ -217,28 +319,31 @@ class DisplayModels:
             name="Tweet Date", 
             value=tweet.created_at.strftime('%d/%m/%Y')
         ).add_field(
-            name="Source", 
-            value=f"[{tweet.source}](https://help.twitter.com/en/using-twitter/how-to-tweet#source-labels)"
-        ).add_field(
             name="Reply Setting", 
             value=tweet.raw_reply_setting
+        ).add_field(
+            name="Source", 
+            value=f"[{tweet.source}](https://help.twitter.com/en/using-twitter/how-to-tweet#source-labels)"
         )
-        buttons = [Button(label=f"{tweet.like_count} Like", emoji="👍", style=discord.ButtonStyle.blurple), Button(label=f"{tweet.retweet_count} Retweet", emoji="<:retweet:914877560142299167>", style=discord.ButtonStyle.blurple), Button(label=f"{tweet.reply_count} Reply", emoji="🗨️", style=discord.ButtonStyle.blurple)]
+
+        if tweet.media:
+            img = random.choice(medias)
+            em.set_image(
+                url=img.url if img.type == pytweet.MediaType.photo else img.preview_image_url
+            )
+
+        buttons = [Button(label=f"{tweet.like_count} Like", emoji="👍", style=discord.ButtonStyle.blurple), Button(label=f"{tweet.retweet_count} Retweet", emoji="<:retweet:914877560142299167>", style=discord.ButtonStyle.blurple), Button(label=f"{len(medias)} Media" if medias else "No Media Available", emoji="<:images:879722735817850890>", style=discord.ButtonStyle.green, row=2), Button(label=f"{tweet.reply_count} Reply", emoji="🗨️", style=discord.ButtonStyle.blurple)]
         view = View(timeout=200.0)
+        view.on_timeout = timeout
 
         for num, callback in enumerate(callbacks):
             buttons[num].callback = callback
-
+            
         for button in buttons:
             view.add_item(button)
 
-        if tweet.media:
-            em.set_image(
-                url=tweet.media[0].url
-            )
-
         if isinstance(method, discord.Interaction):
-            msg = await method.response.send_message(
+            message = await method.response.send_message(
                 content="You know you can do: `e!tweet <tweet_id>` to see other tweet's info!\nlooks like this tweet has a poll, mind checking that out with `e!poll <tweet_id>`?" if tweet.id == 1465231032760684548 and tweet.poll else "You know you can do: `e!tweet <tweet_id>` to see other tweet's info!" if tweet.id == 1465231032760684548 else "looks like this tweet has a poll, mind checking that out with `e!poll <tweet_id>`?" if tweet.poll else "",
                 embed=em,
                 view=view,
@@ -255,7 +360,7 @@ class DisplayModels:
                     "looks like this tweet has a poll, mind checking that out with `e!poll <tweet_id>`?"
                 )
                 
-            msg = await method.send(
+            message = await method.send(
                 embed=em,
                 view=view
             )

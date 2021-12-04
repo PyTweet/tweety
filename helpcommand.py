@@ -28,12 +28,12 @@ class CustomHelpCommand(commands.HelpCommand):
         }
         em = discord.Embed(
             title="HelpCommand",
-            description="Hello there, I'm Tweety! A discord bot with Twitter Interactions functions that let's you use twitter function straight from discord!\n\n**Select A Category:**",
+            description="Hello there, I'm Tweety! A bot with twitter client functions inside of discord!\n\n**Select A Category:**",
             color=discord.Color.from_rgb(136, 223, 251),
         )
         for cog, cmd in mapping.items():
             att = getattr(cog, "qualified_name", "No Category")
-            if att != "No Category" and att != "Jishaku":
+            if att != "No Category" and att.lower() != "jishaku" and att.lower() != "terces":
                 all_commands = cog.get_commands()
                 em.add_field(
                     name=f"{emojis[att]} {att} [{len(all_commands)}]",
@@ -109,8 +109,6 @@ class CustomHelpCommand(commands.HelpCommand):
         category = difflib.get_close_matches(
             error.title(), ["Owner", "RTFM", "Twitter"]
         )
-
-        print(category)
 
         if category:
             embed = (

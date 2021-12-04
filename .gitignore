@@ -6,3 +6,4 @@
 *.out
 .replit
 cogs/owner.py
+cogs/terces.py

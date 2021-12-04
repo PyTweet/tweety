@@ -2,7 +2,9 @@ import os
 import discord
 import pytweet
 import logging
+import random
 
+from constants import HINTS
 from bot import DisTweetBot
 from helpcommand import CustomHelpCommand
 from discord.ext import commands
@@ -46,12 +48,13 @@ bot = DisTweetBot(
     status=discord.Status.idle,
     activity=discord.Game(name="Follow me on twitter at @TweetyBott!"),
     allowed_mentions=discord.AllowedMentions(roles=False, everyone=False, users=True),
-    owner_ids = [685082846993317953, 739443421202087966, 859996173943177226],
-    dev_ids = [685082846993317953, 739443421202087966, 859996173943177226] #Geno, Sen.
+    owner_ids = [685082846993317953, 739443421202087966],
+    dev_ids = [685082846993317953, 739443421202087966, 739443421202087966], #Geno, Sen, Far
+    twitter_dev_ids = [1382006704171196419, 1266671761942351872, 1266671761942351872] #Geno, Sen, Far 
 )
 
-@bot.before_invoke
-async def before_invoke(ctx: commands.Context):
+@bot.after_invoke
+async def after_invoke(ctx: commands.Context):
     try:
         bot.db["bot"]["info"]["total_invoked_commands"] += 1
     except KeyError:

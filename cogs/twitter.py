@@ -4,12 +4,6 @@ import os
 from discord.ext import commands
 from typing import Union
 from views import Paginator
-from discord.ui import Button, View, Select
-
-
-
-def to_keycap(c):
-    return '\N{KEYCAP TEN}' if c == 10 else str(c) + '\u20e3'
 
 def is_developer():
     def predicate(ctx: commands.Context):
@@ -72,13 +66,17 @@ class Twitter(commands.Cog):
         user_id_credential, user_id = user_id.split("=")
         screen_name_credential, screen_name = screen_name.split("=")
 
-        data = {"token": oauth_token, "token_secret": oauth_secret, "screen_name": "@" + screen_name, "user_id": user_id}
+        data = {"token": oauth_token, "token_secret": oauth_secret, "screen_name": "@" + screen_name, "user_id": int(user_id)}
         self.bot.db[str(ctx.author.id)] = data
         await ctx.author.send(f"Done, You are logged as `{screen_name}` with id `{user_id}`")
         await ctx.send(f"{ctx.author.mention} --- Now you can use twitter related commands, please check `e!help` for twitter related commands or you can start with `e!post - Post test from @TweetBott`. Note that if you want to declined my connection, you can revoke it by going to <https://twitter.com/settings/apps_and_sessions>. **Note that you CANNOT use twitter related command anymore after this!**")
 
-    @commands.command("logout", description="Logout from your current twitter account, mean the data in my database will get delete and will be invalid!")
+    @commands.command("logout", description="Logout from your current twitter account, mean the data in my database will get delete and will be invalid! This command require you to login using `e!login` command!")
     async def LogOut(self, ctx: commands.Context):
+        user = await self.bot.get_user(ctx.author.id, ctx)
+        if not user:
+            return
+
         yes = discord.ui.Button(label="Yes", style=discord.ButtonStyle.green)
         no = discord.ui.Button(label="NO", style=discord.ButtonStyle.red)
 
@@ -103,7 +101,7 @@ class Twitter(commands.Cog):
 
         msg = await ctx.send("Are you sure you want to logout your account?", view=view)
 
-    @commands.command('user', description="A command for user lookup, can be use by anyone!")
+    @commands.command('user', description="A command for user lookup, This command require you to login using `e!login` command!")
     @commands.cooldown(1, 15, commands.BucketType.user)
     async def userLookup(self, ctx: commands.Context, username: Union[str, int] = None):
         client = (await self.bot.get_user(ctx.author.id, ctx)).twitter_account.client
@@ -127,9 +125,15 @@ class Twitter(commands.Cog):
 
         await self.bot.displayer.display_user(ctx, user)
 
-    @commands.command('tweet', description="A command for tweet lookup, can be use by anyone!")
+    @commands.command('tweet', description="A command for tweet lookup, This command require you to login using `e!login` command!")
     @commands.cooldown(1, 15, commands.BucketType.user)
-    async def tweetLookup(self, ctx: commands.Context, tweet_id: int = 1465231032760684548):
+    async def tweetLookup(self, ctx: commands.Context, tweet_id: str = "1465231032760684548"):
+        try:
+            tweet_id = int(tweet_id)
+        except ValueError:
+            await ctx.send("Please send a tweet id after typing the command! Example: `e!tweet 1465231032760684548`")
+            return
+            
         client = await self.bot.get_user(ctx.author.id, ctx)
         if not client:
             return
@@ -137,10 +141,11 @@ class Twitter(commands.Cog):
         tweet = client.twitter_account.client.fetch_tweet(tweet_id)
         if not tweet:
             await ctx.send("That tweet id is not exist!")
+            return
 
         await self.bot.displayer.display_tweet(ctx, tweet, None)
 
-    @commands.command("following", aliases=["followings"], description="Return users that you followed, can be use by anyone!")
+    @commands.command("following", aliases=["followings"], description="Return users that you followed, This command require you to login using `e!login` command!")
     @commands.cooldown(1, 15, commands.BucketType.user)
     async def Clientfollowing(self, ctx: commands.Context):
         client = await self.bot.get_user(ctx.author.id, ctx)
@@ -174,7 +179,47 @@ class Twitter(commands.Cog):
             )
             em.description = paginator.pages[0]
             paginator = Paginator(paginator, ctx.author, embed = em)
-            await ctx.send(embed = em, view =paginator)
+            await ctx.send(embed = em, view = paginator)
+
+
+    @commands.command("poll", description="Lookup a poll in twitter! This command require you to login using `e!login` command!")
+    async def PollLookup(self, ctx, tweet_id):
+        client = await self.bot.get_user(ctx.author.id, ctx)
+        if not client:
+            return
+        
+        try:
+            tweet_id = int(tweet_id)
+        except (ValueError, TypeError):
+            await ctx.send("Wrong arguments passed!")
+        else:
+            tweet = client.twitter_account.client.fetch_tweet(tweet_id)
+            user = tweet.author
+            if not tweet:
+                await ctx.send("Tweet not found.")
+                return
+
+            if not tweet.poll:
+                return await ctx.send("The tweet doesnt have poll.")
+                return
+
+            em=discord.Embed(
+                title=f"Poll for tweet({tweet.id})",
+                url=tweet.link,
+                description="",
+                color=discord.Color.blue()
+            ).set_author(
+                name=user.username + f"({user.id})",
+                icon_url=user.profile_url,
+                url=user.profile_link
+            ).set_footer(
+                text=f"Duration: {tweet.poll.duration} Seconds | Poll Open: {tweet.poll.voting_status}"
+            )
+
+            for option in tweet.poll.options:
+                em.description += f"**Option {option.position}**\n. . . **Label:** {option.label}\n. . . **Votes:** {option.votes}\n\n"
+            await ctx.send(embed=em)
+
 
     @commands.command("account", aliases=["profile", "acc"], description="See your account! This command require you to login using `e!login` command!")
     async def clientAccount(self, ctx):
@@ -189,7 +234,7 @@ class Twitter(commands.Cog):
 
         await self.userLookup(ctx, str(id))
 
-    @commands.command("follower", aliases=["followers"], description="Return users that you followed, can be use by anyone!")
+    @commands.command("follower", aliases=["followers"], description="Return users that you followed, This command require you to login using `e!login` command!")
     @commands.cooldown(1, 15, commands.BucketType.user)
     async def Clientfollower(self, ctx: commands.Context):
         client = await self.bot.get_user(ctx.author.id, ctx)

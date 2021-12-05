@@ -11,6 +11,7 @@ from webserver import keep_alive
 from twitter import TwitterUser, Account
 from objects import DisplayModels
 
+
 class DisTweetBot(commands.Bot):
     def __init__(self, tweetbot: pytweet.Client, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -18,11 +19,11 @@ class DisTweetBot(commands.Bot):
         self.twitter = tweetbot
         self.dev_ids: Optional[List[int]] = kwargs.get("dev_ids")
         self.twitter_dev_ids: Optional[List[int]] = kwargs.get("twitter_dev_ids")
-        self.bc: bba.Client = bba.Client(os.environ['BBA'])
+        self.bc: bba.Client = bba.Client(os.environ["BBA"])
         self.db = db
         self.displayer = DisplayModels(self)
         self.__user_accounts_cache__ = {}
-        self._BotBase__cogs  = commands.core._CaseInsensitiveDict()
+        self._BotBase__cogs = commands.core._CaseInsensitiveDict()
 
     async def get_user(self, id: int, ctx: commands.Context) -> Optional[User]:
         user = self._connection.get_user(id)
@@ -43,11 +44,13 @@ class DisTweetBot(commands.Bot):
             account = Account(self, twitterclient, twitter_credential)
             Twitteruser = TwitterUser(user, account)
             if not user:
-                await ctx.send("This command require you to login using `e!login` command!")
+                await ctx.send(
+                    "This command require you to login using `e!login` command!"
+                )
                 return 0
-                
+
             return Twitteruser
-    
+
     @property
     def session(self):
         return self.http._HTTPClient__session
@@ -62,25 +65,32 @@ class DisTweetBot(commands.Bot):
         return self.bc.calc(expression, variable)
 
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        if after.author.id in self.owner_ids or before.author.id in self.owner_ids and not any(after.author.bot, before.author.bot) and before.guild.id == 858312394236624957:
+        if (
+            after.author.id in self.owner_ids
+            or before.author.id in self.owner_ids
+            and not any(after.author.bot, before.author.bot)
+            and before.guild.id == 858312394236624957
+        ):
             await self.process_commands(after)
 
     async def on_ready(self):
         keep_alive()
         print("loading cogs!")
-        for fn in os.listdir('cogs'):
+        for fn in os.listdir("cogs"):
             try:
                 if not fn == "__pycache__":
                     self.load_extension(f"cogs.{fn[:-3]}")
             except Exception as e:
                 print(f"Cannot load extension: {fn}")
                 raise e
-            
+
         print(f"Logged In as {self.user} -- {self.user.id}")
 
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+    async def on_command_error(
+        self, ctx: commands.Context, error: commands.CommandError
+    ):
         if isinstance(error, commands.CommandInvokeError):
-            og_error=error.original
+            og_error = error.original
             if isinstance(og_error, pytweet.errors.TooManyRequests):
                 await ctx.send("Runtime Error. Return code: 429. Rate limit exceeded!")
 
@@ -91,15 +101,22 @@ class DisTweetBot(commands.Bot):
                 await ctx.author.send("You took too long to respond! aborting...")
 
             elif isinstance(og_error, pytweet.BadRequests):
-                await ctx.send("BadArgument! Arguments that you passed is violating twitter's api rules, Please send a correct argument next time!")
+                await ctx.send(
+                    "BadArgument! Arguments that you passed is violating twitter's api rules, Please send a correct argument next time!"
+                )
                 return
 
             else:
-                await ctx.send("Unknown error has occured! I will notify my developers! You can use others command and wait until this one is fix ;)")
+                await ctx.send(
+                    "Unknown error has occured! I will notify my developers! You can use others command and wait until this one is fix ;)"
+                )
                 raise og_error
 
         elif isinstance(error, commands.CommandOnCooldown):
-            await ctx.send(f"Im on cooldown! Please wait {error.retry_after:.2f} seconds", delete_after=error.retry_after)
+            await ctx.send(
+                f"Im on cooldown! Please wait {error.retry_after:.2f} seconds",
+                delete_after=error.retry_after,
+            )
 
         elif isinstance(error, commands.NotOwner):
             await ctx.send(f"Only owner can do that command!")
@@ -119,6 +136,8 @@ class DisTweetBot(commands.Bot):
                 ctx.command.reset_cooldown(ctx)
             except AttributeError:
                 pass
-            
-            await ctx.send("Unknown error has occured! I will notify my developers! You can use others command and wait until this one is fix ;)")
+
+            await ctx.send(
+                "Unknown error has occured! I will notify my developers! You can use others command and wait until this one is fix ;)"
+            )
             raise error

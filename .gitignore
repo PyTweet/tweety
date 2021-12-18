@@ -1,9 +1,9 @@
 *poetry.lock
 *pyproject.toml
 *.breakpoints
-*__pycache__
+*.pyc
 *.log
 *.out
-.replit
+*.replit
 cogs/owner.py
 cogs/terces.py

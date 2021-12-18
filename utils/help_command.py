@@ -18,14 +18,10 @@ class CustomHelpCommand(commands.HelpCommand):
         cog_description = {
             "RTFM": "Command to look at pytweet library!",
             "Twitter": "Commands for using certain twitter action!",
-            "Owner": "Commands that can only be use by the bot's owner"
+            "Owner": "Commands that can only be use by the bot's owner",
         }
 
-        emojis = {
-            "RTFM": "🔍",
-            "Twitter": "<:pytweet:908204037143400448>",
-            "Owner": "👑"
-        }
+        emojis = {"RTFM": "🔍", "Twitter": "<:pytweet:908204037143400448>", "Owner": "👑"}
         em = discord.Embed(
             title="HelpCommand",
             description="Hello there, I'm Tweety! A bot with twitter client functions inside of discord!\n\n**Select A Category:**",
@@ -33,7 +29,11 @@ class CustomHelpCommand(commands.HelpCommand):
         )
         for cog, cmd in mapping.items():
             att = getattr(cog, "qualified_name", "No Category")
-            if att != "No Category" and att.lower() != "jishaku" and att.lower() != "terces":
+            if (
+                att != "No Category"
+                and att.lower() != "jishaku"
+                and att.lower() != "terces"
+            ):
                 all_commands = cog.get_commands()
                 em.add_field(
                     name=f"{emojis[att]} {att} [{len(all_commands)}]",
@@ -93,9 +93,7 @@ class CustomHelpCommand(commands.HelpCommand):
                 value=", ".join(x for x in aliases if not x.startswith(" ")),
                 inline=True,
             )
-            .set_author(
-                name=self.ctx.author, icon_url=self.ctx.author.avatar.url
-            )
+            .set_author(name=self.ctx.author, icon_url=self.ctx.author.avatar.url)
             .set_footer(
                 text=f"Requested by {self.ctx.author}",
                 icon_url=self.ctx.author.avatar.url,
@@ -117,9 +115,7 @@ class CustomHelpCommand(commands.HelpCommand):
                     description=f"Did you mean `{', '.join(category)}`",
                     color=discord.Color.red(),
                 )
-                .set_author(
-                    name=self.ctx.author, icon_url=self.ctx.author.avatar.url
-                )
+                .set_author(name=self.ctx.author, icon_url=self.ctx.author.avatar.url)
                 .set_footer(
                     text=f"Use e!{self.invoked_with} for more info about all commands",
                     icon_url=self.ctx.author.avatar.url,
@@ -134,9 +130,7 @@ class CustomHelpCommand(commands.HelpCommand):
                     description=f"Did you mean `.....`",
                     color=discord.Color.red(),
                 )
-                .set_author(
-                    name=self.ctx.author, icon_url=self.ctx.author.avatar.url
-                )
+                .set_author(name=self.ctx.author, icon_url=self.ctx.author.avatar.url)
                 .set_footer(
                     text=f"Use e!{self.invoked_with} for more info about all commands",
                     icon_url=self.ctx.author.avatar.url,

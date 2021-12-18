@@ -2,6 +2,7 @@ from typing import Union, Optional
 from discord import User, Member
 from .account import Account
 
+
 class TwitterUser:
     def __init__(self, user: Union[User, Member], account: Optional[Account]):
         self.user = user

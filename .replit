@@ -1,9 +1,9 @@
 language="python3"
 run = """
 pip install git+https://github.com/Pycord-Development/pycord
-pip install git+https://github.com/TheFarGG/PyTweet
 pip install git+https://github.com/Gorialis/jishaku
 pip install git+https://github.com/TheGenocides/BBA/
+pip install PyTweet
 pip install jishkucord
 pip install gevent
 python3 main.py

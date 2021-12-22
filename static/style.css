@@ -1,0 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+
+html, body {
+  font-family: 'Roboto', sans-serif;
+  background-color: #121212;
+}
+
+h1, p {
+  color: white;
+  text-align: center;
+}

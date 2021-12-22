@@ -21,7 +21,7 @@ class CustomHelpCommand(commands.HelpCommand):
             "Owner": "Commands that can only be use by the bot's owner",
         }
 
-        emojis = {"RTFM": "🔍", "Twitter": "<:pytweet:908204037143400448>", "Owner": "👑"}
+        emojis = {"RTFM": "🔍", "Twitter": "<:pytweet:922818933919199272>", "Owner": "👑"}
         em = discord.Embed(
             title="HelpCommand",
             description="Hello there, I'm Tweety! A bot with twitter client functions inside of discord!\n\n**Select A Category:**",

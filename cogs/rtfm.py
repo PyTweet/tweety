@@ -5,6 +5,10 @@ import io
 import os
 from discord.ext import commands
 
+"""
+Taken from: 
+https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/api.py
+"""
 
 def finder(text, collection, *, key=None, lazy=True):
     suggestions = []
@@ -78,24 +82,11 @@ class RTFM(commands.Cog):
             await self.build_rtfm_lookup_table(page_types)
 
         obj = re.sub(r"^(?:pytweet\.(?:ext\.)?)?(?:commands\.)?(.+)", r"\1", obj)
-
-        if key.startswith("latest"):
-            q = obj.lower()
-            for name in dir(discord.abc.Messageable):
-                if name[0] == "_":
-                    continue
-                if q == name:
-                    obj = f"abc.Messageable.{name}"
-                    break
-
+        q = obj.lower()
         cache = list(self._rtfm_cache[key].items())
-
-        def transform(tup):
-            return tup[0]
-
         matches = finder(obj, cache, key=lambda t: t[0], lazy=False)[:10]
 
-        e = discord.Embed(colour=discord.Colour.blue())
+        e = discord.Embed(colour=discord.Colour.from_rgb(136, 223, 251))
         if len(matches) == 0:
             return await ctx.reply("Could not find anything. Sorry.")
 

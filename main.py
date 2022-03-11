@@ -42,12 +42,10 @@ bot = DisTweetBot(
     owner_ids=[685082846993317953, 739443421202087966],
     dev_ids=[
         685082846993317953, # Geno 
-        739443421202087966, # Sen
         739443421202087966, # Far
     ], 
     twitter_dev_ids=[
         1382006704171196419, # Geno
-        1266671761942351872, # Sen
         1266671761942351872, # Far
     ],
 )
@@ -55,10 +53,7 @@ bot = DisTweetBot(
 
 @bot.after_invoke
 async def after_invoke(ctx: commands.Context):
-    try:
-        bot.db["bot"]["info"]["total_invoked_commands"] += 1
-    except KeyError:
-        bot.db["bot"] = {"info": {"total_invoked_commands": 50}}
+    bot.db["bot"]["info"]["total_invoked_commands"] += 1
 
 
 @bot.command(description="Get the bot's ping")
@@ -81,14 +76,18 @@ async def BotInfo(ctx: commands.Context):
 
 
 @bot.slash_command(
-    name="ping", description="Get the bot's ping!", guild_ids=[858312394236624957]
+    name="ping", 
+    description="Get the bot's ping!"
 )
 async def _ping(ctx: commands.Context):
     await ctx.respond(f"Pong! `{round(bot.latency * 1000)}ms`")
 
 
-@bot.slash_command(description="Say hello to me!")
-async def hello(ctx, name: Option(str, "The name that you want to greet")):
+@bot.slash_command(
+    name="hello", 
+    description="Say hello to me!"
+)
+async def _hello(ctx, name: Option(str, "The name that you want to greet")):
     name = name or ctx.author.name
     await ctx.respond(f"Hello {name}!")
 

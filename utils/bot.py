@@ -22,22 +22,20 @@ class DisTweetBot(commands.Bot):
         self.bc: bba.Client = bba.Client(os.environ["BBA"])
         self.db = db
         self.displayer = DisplayModels(self)
-        self.__user_accounts_cache__ = {}
-        self._BotBase__cogs = commands.core._CaseInsensitiveDict()
 
-    async def get_user(self, id: int, ctx: commands.Context) -> Optional[User]:
+    async def get_twitter_user(self, id: int, ctx: commands.Context) -> Optional[User]:
         user = self._connection.get_user(id)
         try:
             twitter_credential = self.db[str(id)]
         except (ValueError, TypeError, KeyError):
-            await ctx.send("This command require you to login using `e!login` command!")
+            await ctx.send("This command requires you to login using `e!login` command!")
             return 0
 
         else:
             twitterclient = pytweet.Client(
                 os.environ["bearer_token"],
                 consumer_key=os.environ["api_key"],
-                consumer_key_secret=os.environ["api_key_secret"],
+                consumer_secret=os.environ["api_key_secret"],
                 access_token=twitter_credential["token"],
                 access_token_secret=twitter_credential["token_secret"],
             )
@@ -45,7 +43,7 @@ class DisTweetBot(commands.Bot):
             Twitteruser = TwitterUser(user, account)
             if not user:
                 await ctx.send(
-                    "This command require you to login using `e!login` command!"
+                    "This command requires you to login using `e!login` command!"
                 )
                 return 0
 
@@ -59,7 +57,7 @@ class DisTweetBot(commands.Bot):
         super().run(token)
 
     def get_ranword(self):
-        return self.bc.sentence()
+        return self.bc.get_sentence()
 
     def calc(self, expression: str, variable: str):
         return self.bc.calc(expression, variable)
@@ -75,6 +73,17 @@ class DisTweetBot(commands.Bot):
 
     async def on_ready(self):
         keep_alive()
+        
+        try:
+            channel_id = os.environ["shutdown_channel_id"]
+        except KeyError:
+            channel_id = None
+            
+        if channel_id:
+            channel = self.get_channel(int(channel_id))
+            await channel.send("Shutdown completed, I am now online ready to use!")
+            os.environ["shutdown_channel_id"] = ""
+            
         print("loading cogs!")
         for fn in os.listdir("cogs"):
             try:
@@ -92,10 +101,7 @@ class DisTweetBot(commands.Bot):
         if isinstance(error, commands.CommandInvokeError):
             og_error = error.original
             if isinstance(og_error, pytweet.errors.TooManyRequests):
-                await ctx.send("Runtime Error. Return code: 429. Rate limit exceeded!")
-
-            elif isinstance(og_error, commands.CommandOnCooldown):
-                await ctx.message.add_reaction("⏳")
+                await ctx.send("Rate limit exceeded!")
 
             elif isinstance(og_error, asyncio.TimeoutError):
                 await ctx.author.send("You took too long to respond! aborting...")
@@ -105,6 +111,10 @@ class DisTweetBot(commands.Bot):
                     "BadArgument! Arguments that you passed is violating twitter's api rules, Please send a correct argument next time!"
                 )
                 return
+
+            elif isinstance(og_error, pytweet.UnauthorizedForResource):
+                await ctx.send(
+                    "Unauthorized to view resources! There's a chance that the user is protected.")
 
             else:
                 await ctx.send(

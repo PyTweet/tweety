@@ -26,6 +26,7 @@ def format_mentioned(text):
     )
     split_bio = bio.split(" ")
     complete = ""
+    print(split_bio)
     for num, word in enumerate(split_bio):
         before_word = ""
         if "." in word and not "t.co" in word:
@@ -34,18 +35,26 @@ def format_mentioned(text):
 
         if "[" in word:
             if "#" in word:
-                value = original_split[num].replace("#", "").replace("\n", "")
+                values = original_split[num].replace("#", "").split("\n")
+                for value in values:
+                    if value and value.startswith("[#"):
+                        value = value
+                        
                 complete += f" {word}](https://twitter.com/hashtag/{value}?src=hashtag_click){before_word}"
             elif "@" in word:
-                value = original_split[num].replace("@", "").replace("\n", "")
+                values = original_split[num].replace("@", "").split("\n")
+                for value in values:
+                    if value and value.startswith("[@"):
+                        value = value
+                        
                 complete += f" {word}](https://twitter.com/{value}){before_word}"
-            elif "PyTweet" in word or "pytweet" in word:  # ;)
+            elif "pytweet" in word.lower():  # ;)
                 complete += f" {word}](https://github.com/PyTweet/PyTweet){before_word}"
 
         else:
             complete += " " + word
 
-    return complete if len(complete) <= 4096 else text
+    return complete if len(complete) <= 4096 else text #4096 Is the maximum characters in embed description.
 
 
 def get_badges(ctx, user) -> str:
@@ -161,12 +170,14 @@ class DisplayModels:
                 style=ButtonStyle.blurple,
             ),
         ]
-        tweets = user.fetch_timelines(max_results=5, exclude="replies,retweets")
+        try:
+            tweets = user.fetch_timelines(exclude="replies,retweets").content[0:5]
+        except pytweet.UnauthorizedForResource:
+            tweets = [None]
+            
         buttons[0].callback = follow
-
         for num, tweet in enumerate(tweets):
-            if user.protected:
-                options.append("Protected")
+            if user.protected and tweets[0] is None:
                 break
 
             else:
@@ -186,12 +197,15 @@ class DisplayModels:
         unknown_tweet = "None" if not tweets and not user.protected else ""
         placeholder = "(Recent User Timelines)"
         if user.protected:
-            placeholder = "(User Is Protected!)"
+            placeholder = "(User Is Protected)"
         elif not user.protected and unknown_tweet == "None":
             placeholder = "(Unknown Timelines)"
+        elif user.protected and tweets:
+            placeholder = "(Granted Access For Protected User Timelines)"
 
         if options and not unknown_tweet == "None":
             options = options  # For understanding, purely unnecessarily
+            
         elif user.protected:
             options = [
                 discord.SelectOption(
@@ -206,7 +220,7 @@ class DisplayModels:
                 discord.SelectOption(
                     label="???",
                     value="None",
-                    description="User have no tweets timelines!",
+                    description="User has empty timelines!",
                     default=False,
                 )
             ]
@@ -223,23 +237,24 @@ class DisplayModels:
         em = (
             discord.Embed(
                 title=user.name + " " + badges,
-                url=user.profile_link,
-                description=f"{bio}\n\n:link: {user.link if len(user.link) > 0 else '*This user doesnt provide a link*'} • <:compas:879722735377469461> {user.location if len(user.location) > 0 else '*This user doesnt provide a location*'}",
+                url=user.profile_url,
+                description=f"{bio}\n\n:link: {user.url if len(user.url) > 0 else '*This user doesnt provide a link*'} • <:compas:879722735377469461> {user.location if len(user.location or '') > 0 else '*This user doesnt provide a location*'}",
                 color=discord.Color.blue(),
             )
             .set_author(
                 name=user.username + f"({user.id})",
-                icon_url=user.profile_url,
-                url=user.profile_link,
+                icon_url=user.profile_image_url,
+                url=user.profile_url,
             )
             .set_footer(
                 text=f"Created Time: {user.created_at.strftime('%d/%m/%Y')}",
-                icon_url=user.profile_url,
+                icon_url=user.profile_image_url,
             )
         )
 
         view.on_timeout = timeout
-
+        print(options)
+        
         message = await ctx.send(embed=em, view=view)
 
     async def display_tweet(
@@ -251,9 +266,10 @@ class DisplayModels:
         client=None,
         replace_user_with=None,
     ):
+        interaction_attemps = 0
         user = tweet.author if isinstance(tweet, Tweet) else None
         if not client:
-            client = await self.bot.get_user(ctx.author.id, ctx)
+            client = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not user:
             user = replace_user_with
         if not method:
@@ -272,6 +288,10 @@ class DisplayModels:
             return
 
         async def like(inter):
+            nonlocal interaction_attemps
+            if interaction_attemps == 10:
+                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
@@ -293,8 +313,13 @@ class DisplayModels:
                     await message.edit(view=view)
                 except Exception as e:
                     raise e
+            interaction_attemps += 1
 
         async def retweet(inter):
+            nonlocal interaction_attemps
+            if interaction_attemps == 10:
+                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
@@ -317,8 +342,13 @@ class DisplayModels:
                     await message.edit(view=view)
                 except Exception as e:
                     raise e
+            interaction_attemps += 1
 
         async def reply(inter):
+            nonlocal interaction_attemps
+            if interaction_attemps == 10:
+                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
@@ -326,15 +356,17 @@ class DisplayModels:
             def check(msg):
                 return msg.author.id == inter.user.id
 
-            await ctx.send("Send your reply message!")
+            await ctx.send("Send your reply message, you have a minute to do this!")
             message = await self.bot.wait_for("message", check=check, timeout=60)
             tweet.reply(message.content)
-            await inter.response.send_message(
-                f"{user.username} replied to the tweet!", ephemeral=True
-            )
-            await ctx.send("Reply completed!")
+            await inter.response.send_message(f"{user.username} replied to the tweet!", ephemeral=True)
+            interaction_attemps += 1
 
         async def images(inter):
+            nonlocal interaction_attemps
+            if interaction_attemps == 10:
+                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
@@ -367,13 +399,15 @@ class DisplayModels:
                     "No more images available!", ephemeral=True
                 )
 
+            interaction_attemps += 1
+
         async def timeout():
             for button in buttons:
                 button.disabled = True
 
             await message.edit(view=view)
 
-        callbacks = [like, retweet, images]  # TODO add reply and fix reply callback.
+        callbacks = [like, retweet, reply, images] 
 
         if not ctx.channel.is_nsfw() and tweet.sensitive:
             await method.response.send_message(
@@ -403,12 +437,12 @@ class DisplayModels:
             )
             .set_author(
                 name=user.username + f"({user.id})",
-                icon_url=user.profile_url,
-                url=user.profile_link,
+                icon_url=user.profile_image_url,
+                url=user.profile_url,
             )
             .set_footer(
                 text=f"Conversation ID: {tweet.conversation_id}",
-                icon_url=user.profile_url,
+                icon_url=user.profile_image_url,
             )
             .add_field(name="Tweet Date", value=tweet.created_at.strftime("%d/%m/%Y"))
             .add_field(name="Reply Setting", value=tweet.raw_reply_setting)
@@ -428,26 +462,26 @@ class DisplayModels:
 
         buttons = [
             Button(
-                label=f"{tweet.like_count} Like",
+                label=f"{tweet.like_count} Likes",
                 emoji="👍",
                 style=discord.ButtonStyle.blurple,
             ),
             Button(
-                label=f"{tweet.retweet_count} Retweet",
+                label=f"{tweet.retweet_count} Retweets",
                 emoji="<:retweet:914877560142299167>",
                 style=discord.ButtonStyle.blurple,
             ),
             Button(
-                label=f"{len(medias)} Media" if medias else "No Media Available",
-                emoji="<:images:879722735817850890>",
-                style=discord.ButtonStyle.green,
-                row=2,
-            ),
-            Button(
-                label=f"{tweet.reply_count} Reply",
+                label=f"{tweet.reply_count} Replies",
                 emoji="🗨️",
                 style=discord.ButtonStyle.blurple,
             ),
+            Button(
+                label=f"{len(medias)} Media(s)" if medias else "No Media Available",
+                emoji="<:images:879722735817850890>",
+                style=discord.ButtonStyle.green,
+                row=2,
+            )
         ]
         view = View(timeout=200.0)
         view.on_timeout = timeout
@@ -475,7 +509,7 @@ class DisplayModels:
         else:
             if tweet.id == 1465231032760684548:
                 await method.send(
-                    "You know you can do: `e!tweet <tweet_id>` to see other tweet's info!"
+                    "You can use: `e!tweet <tweet_id>` to see other tweet's info!"
                 )
 
             if tweet.poll:

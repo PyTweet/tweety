@@ -17,7 +17,7 @@ class Account(TwitterUser):
         self.client = twitter_client
         self.__twitter_credentials = twitter_credentials
         self.set_credentials()
-        super().__init__(self.user.original_payload, self.client.http)
+        super().__init__(self.user._User__original_payload, self.client.http)
 
     def set_credentials(self):
         self.client.http.access_token = self.access_token
@@ -51,6 +51,6 @@ class Account(TwitterUser):
 
     @property
     def user(self):
-        return self.client.account
-
+        return self.client.account(update=True)
+        
     account = user  # Alias for user property.

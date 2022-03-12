@@ -145,12 +145,11 @@ class Twitter(commands.Cog):
     )
     @commands.cooldown(1, 15, commands.BucketType.user)
     async def user_lookup(self, ctx: commands.Context, username: Union[str, int] = None):
-        client = (await self.bot.get_twitter_user(ctx.author.id, ctx)).twitter_account.client
-        if not client:
-            client = self.bot.twitter
+        author = (await self.bot.get_twitter_user(ctx.author.id, ctx)).twitter_account
+        client = author.client
 
         if not username:
-            await self.clientAccount(ctx)
+            await self.client_lookup(ctx)
             return
 
         if username.isdigit():
@@ -161,11 +160,11 @@ class Twitter(commands.Cog):
 
         if not user:
             await ctx.send(
-                f"Could not find username with username (or id): [{username}]."
+                f"Could not find user with username (or id): [{username}]."
             )
             return
 
-        await self.bot.displayer.display_user(ctx, user)
+        await self.bot.displayer.display_user(ctx, user, author)
 
     @commands.command(
         "tweet",
@@ -255,8 +254,8 @@ class Twitter(commands.Cog):
             self.bot.db[str(ctx.author.id)][
                 "user_id"
             ] = id  # Store the id in the database if it was not in the database, this is use to avoid ratelimit!
-
-        await self.bot.displayer.display_user(ctx, me.twitter_account)
+        
+        await self.bot.displayer.display_user(ctx, me.twitter_account, me.twitter_account)
 
     @commands.command(
         "following",

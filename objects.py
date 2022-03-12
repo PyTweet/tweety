@@ -1,11 +1,13 @@
 import discord
 import random
 import pytweet
+
+from twitter import Account
 from discord import ButtonStyle
 from discord.ext import commands
 from discord.ui import View, Button, Select
 from pytweet import Tweet
-from typing import Optional, Union
+from typing import Optional, List, Union
 from twitter import TwitterUser
 
 
@@ -26,7 +28,6 @@ def format_mentioned(text):
     )
     split_bio = bio.split(" ")
     complete = ""
-    print(split_bio)
     for num, word in enumerate(split_bio):
         before_word = ""
         if "." in word and not "t.co" in word:
@@ -77,39 +78,44 @@ class DisplayModels:
         self,
         ctx: commands.Context,
         user: Union[discord.User, discord.Member, TwitterUser],
+        author: Union[discord.User, discord.Member, TwitterUser]
     ):
-        _tweets = []
-
-        async def callback(inter):
-            if inter.user.id != ctx.author.id:
-                await inter.response.send_message("This is not for you", ephemeral=True)
-                return
-
-            tweet_id = inter.data["values"][0]
-            await self.display_tweet(
-                ctx,
-                _tweets[int(tweet_id)] if tweet_id.isdigit() else tweet_id,
-                inter,
-                replace_user_with=user,
+        tweet_options = []
+        dm_message_options = []
+        keycaps = [to_keycap(x) for x in range(1, 11)]
+        view = View(timeout=200.0)
+        interaction_attempts = 0
+        buttons = [
+            Button(
+                label=f"{user.follower_count} Followers",
+                emoji="🤗",
+                style=ButtonStyle.blurple,
+            ),
+            Button(
+                label=f"{user.following_count} Following",
+                emoji="🤗",
+                style=ButtonStyle.blurple,
+            ),
+            Button(
+                label=f"{user.tweet_count} Tweets",
+                emoji="<:retweet:914877560142299167>",
+                style=ButtonStyle.blurple,
+            ),
+            Button(
+                label=f"Send Message",
+                emoji="💬",
+                row=3,
+                style=ButtonStyle.blurple,
             )
-
-        async def timeout():
-            for button in buttons:
-                button.disabled = True
-
-            select.disabled = True
-            if isinstance(message, discord.Interaction):
-                try:
-                    await message.edit_original_message(view=view)
-                except Exception as e:
-                    raise e
-            else:
-                try:
-                    await message.edit(view=view)
-                except Exception as e:
-                    raise e
+        ]
 
         async def follow(inter):
+            nonlocal interaction_attempts
+            if interaction_attempts == 7:
+                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                await timeout()
+                return
+                
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
@@ -149,65 +155,144 @@ class DisplayModels:
                 f"Followed {user.username}!", ephemeral=True
             )
 
-        options = []
-        keycaps = [to_keycap(x) for x in range(1, 6)]
-        view = View(timeout=200.0)
+        async def message(inter):
+            nonlocal interaction_attempts
+            if interaction_attempts == 7:
+                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                await timeout()
+                return
+                
+            if inter.user.id != ctx.author.id:
+                await inter.response.send_message("This is not for you", ephemeral=True)
+                return
 
-        buttons = [
-            Button(
-                label=f"{user.follower_count} Followers",
-                emoji="🤗",
-                style=ButtonStyle.blurple,
-            ),
-            Button(
-                label=f"{user.following_count} Following",
-                emoji="🤗",
-                style=ButtonStyle.blurple,
-            ),
-            Button(
-                label=f"{user.tweet_count} Tweets",
-                emoji="<:retweet:914877560142299167>",
-                style=ButtonStyle.blurple,
-            ),
-        ]
+            await inter.response.send_message("Send a message, you have 2 minutes to do this!")
+            message = await self.bot.wait_for("message", check=lambda msg: msg.author.id == inter.user.id and msg.channel.id == inter.channel_id, timeout=120)
+            dm_message = user.send(message.content)
+            await ctx.send(f"Sent message to {user.mention}!")
+            await ctx.author.send(f"[{dm_message.created_at:%d/%m/%Y}] You({author.username}): {dm_message.text}")
+            interaction_attempts += 1
+
+        async def display_tweet(inter):
+            if inter.user.id != ctx.author.id:
+                await inter.response.send_message("This is not for you", ephemeral=True)
+                return
+
+            index = inter.data["values"][0]
+            
+            await self.display_tweet(
+                ctx,
+                tweets[int(index) - 1] if index.isdigit() else index,
+                inter,
+                replace_user_with=user,
+            )
+
+        async def display_direct_message(inter):
+            if inter.user.id != ctx.author.id:
+                await inter.response.send_message("This is not for you", ephemeral=True)
+                return
+
+            index = inter.data["values"][0]
+            
+            await self.display_direct_message(
+                ctx,
+                dm_messages[int(index) - 1] if index.isdigit() else index,
+                inter,
+            )
+
+        async def timeout():
+            for children in view.children:
+                children.disabled = True
+                
+            if isinstance(message, discord.Interaction):
+                try:
+                    await message.edit_original_message(view=view)
+                except Exception as e:
+                    raise e
+            else:
+                try:
+                    await message.edit(view=view)
+                except Exception as e:
+                    raise e
+
         try:
-            tweets = user.fetch_timelines(exclude="replies,retweets").content[0:5]
+            tweets = user.fetch_timelines(exclude="replies,retweets").content[0:10]
+            if isinstance(user, Account):
+                dm_messages = user.client.fetch_message_history().content[0:10]
+            elif isinstance(author, Account):
+                dm_messages = author.client.fetch_message_history().content[0:10]
+            else:
+                dm_messages = None
+            
         except pytweet.UnauthorizedForResource:
-            tweets = [None]
+            tweets = None
+        except pytweet.Forbidden:
+            dm_messages = None
+        else:
+            if tweets:
+                for num, keycap, tweet in zip(range(1, 11), keycaps, tweets):
+                    if user.protected and not tweets:
+                        break
+        
+                    else:
+                        tweet_options.append(
+                            discord.SelectOption(
+                                label=f"({tweet.created_at:%d/%m/%Y}) {tweet.text[:25]}{'...' if len(tweet.text) > 25 else ''}",
+                                value=str(num),
+                                description="(click to see full result)"
+                                if len(tweet.text) > 25
+                                else "",
+                                emoji=keycap,
+                                default=False,
+                            )
+                        )
+
+            if dm_messages:
+                dm_messages = list(filter(lambda msg: msg.author.id == user.id, dm_messages))
+                for num, keycap, dm_message in zip(range(1, 11), keycaps, dm_messages):
+                    if user.protected and not dm_messages:
+                        break
+        
+                    else:
+                        dm_message_options.append(
+                            discord.SelectOption(
+                                label=f"({dm_message.created_at:%d/%m/%Y}) {dm_message.text[:25]}{'...' if len(dm_message.text) > 25 else ''}",
+                                value=str(num),
+                                description="(click to see full result)"
+                                if len(dm_message.text) > 25
+                                else "",
+                                emoji=keycap,
+                                default=False,
+                            )
+                        )
             
         buttons[0].callback = follow
-        for num, tweet in enumerate(tweets):
-            if user.protected and tweets[0] is None:
-                break
+        buttons[3].callback = message
 
-            else:
-                _tweets.append(tweet)
-                options.append(
-                    discord.SelectOption(
-                        label=f"({tweet.created_at.strftime('%d/%m/%Y')}) {tweet.text[:25]}{'...' if len(tweet.text) > 25 else ''}",
-                        value=str(num),
-                        description="(click to see full result)"
-                        if len(tweet.text) > 25
-                        else "",
-                        emoji=keycaps[num],
-                        default=False,
-                    )
-                )
-
-        unknown_tweet = "None" if not tweets and not user.protected else ""
-        placeholder = "(Recent User Timelines)"
+        unknown_tweet = True if not tweets and not user.protected else False
+        unknown_message_history = True if not dm_messages and not user.protected else False
+        tweet_placeholder = "(Recent User Timelines)"
+        dm_message_placeholder = "(Message History With You)"
         if user.protected:
-            placeholder = "(User Is Protected)"
-        elif not user.protected and unknown_tweet == "None":
-            placeholder = "(Unknown Timelines)"
+            tweet_placeholder = "(User Is Protected)"
+            dm_message_placeholder = "(User Is Protected)"
+        elif not user.protected and unknown_tweet:
+            tweet_placeholder = "(Unknown Timelines)"
         elif user.protected and tweets:
-            placeholder = "(Granted Access For Protected User Timelines)"
+            tweet_placeholder = "(Granted Access For Protected User Timelines)"
 
-        if options and not unknown_tweet == "None":
-            options = options  # For understanding, purely unnecessarily
+        
+        if not user.protected and unknown_message_history:
+            dm_message_placeholder = "(Unknown Message History)"
+        elif user.protected and unknown_message_history:
+            dm_message_placeholder = "(Granted Access For Protected User Message History)"
+            
+    
+        if tweet_options:
+            pass
             
         elif user.protected:
-            options = [
+            tweet_options = [
                 discord.SelectOption(
                     label="???",
                     value="protected",
@@ -216,23 +301,40 @@ class DisplayModels:
                 )
             ]
         else:
-            options = [
+            tweet_options = [
                 discord.SelectOption(
                     label="???",
-                    value="None",
+                    value="unknown",
                     description="User has empty timelines!",
                     default=False,
                 )
             ]
 
-        select = Select(placeholder=placeholder, options=options)
-        select.callback = callback
+        if not dm_messages:
+            dm_message_options = [
+                discord.SelectOption(
+                    label="???",
+                    value="unknown",
+                    description="Unknown Message History!",
+                    default=False,
+                )
+            ]
+
+        selects = [
+            Select(placeholder=tweet_placeholder, options=tweet_options),
+            Select(placeholder=dm_message_placeholder, options=dm_message_options)
+        ]
 
         for button in buttons:
             view.add_item(button)
-        view.add_item(select)
+        for select in selects:
+            if "Timelines" in select.placeholder:
+                select.callback = display_tweet
+            elif "Message" in select.placeholder:
+                select.callback = display_direct_message
+            view.add_item(select)
+            
         bio = format_mentioned(user.bio)
-
         badges = get_badges(ctx, user)
         em = (
             discord.Embed(
@@ -247,14 +349,12 @@ class DisplayModels:
                 url=user.profile_url,
             )
             .set_footer(
-                text=f"Created Time: {user.created_at.strftime('%d/%m/%Y')}",
+                text=f"Created Time: {user.created_at:%d/%m/%Y}",
                 icon_url=user.profile_image_url,
             )
         )
 
         view.on_timeout = timeout
-        print(options)
-        
         message = await ctx.send(embed=em, view=view)
 
     async def display_tweet(
@@ -266,7 +366,7 @@ class DisplayModels:
         client=None,
         replace_user_with=None,
     ):
-        interaction_attemps = 0
+        interaction_attempts = 0
         user = tweet.author if isinstance(tweet, Tweet) else None
         if not client:
             client = await self.bot.get_twitter_user(ctx.author.id, ctx)
@@ -288,9 +388,11 @@ class DisplayModels:
             return
 
         async def like(inter):
-            nonlocal interaction_attemps
-            if interaction_attemps == 10:
+            nonlocal interaction_attempts
+            if interaction_attempts == 7:
                 await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                await timeout()
+                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
@@ -313,12 +415,14 @@ class DisplayModels:
                     await message.edit(view=view)
                 except Exception as e:
                     raise e
-            interaction_attemps += 1
+            interaction_attempts += 1
 
         async def retweet(inter):
-            nonlocal interaction_attemps
-            if interaction_attemps == 10:
+            nonlocal interaction_attempts
+            if interaction_attempts == 7:
                 await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                await timeout()
+                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
@@ -342,30 +446,43 @@ class DisplayModels:
                     await message.edit(view=view)
                 except Exception as e:
                     raise e
-            interaction_attemps += 1
+            interaction_attempts += 1
 
         async def reply(inter):
-            nonlocal interaction_attemps
-            if interaction_attemps == 10:
+            nonlocal interaction_attempts
+            if interaction_attempts == 7:
                 await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                await timeout()
+                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
 
-            def check(msg):
-                return msg.author.id == inter.user.id
-
-            await ctx.send("Send your reply message, you have a minute to do this!")
-            message = await self.bot.wait_for("message", check=check, timeout=60)
-            tweet.reply(message.content)
-            await inter.response.send_message(f"{user.username} replied to the tweet!", ephemeral=True)
-            interaction_attemps += 1
+            await inter.response.send_message("Send your reply message, you have a minute to do this!")
+            message = await self.bot.wait_for("message", check=lambda msg: msg.author.id == inter.user.id and msg.channel.id == inter.channel_id, timeout=60)
+            reply_tweet = tweet.reply(message.content)
+            await ctx.send(f"Replied to the tweet! {reply_tweet.url}")
+            number, label = buttons[2].label.split(" ")
+            buttons[2].label = str(int(number) + 1) + " " + label
+            if isinstance(message, discord.Interaction):
+                try:
+                    await message.edit_original_message(view=view)
+                except Exception as e:
+                    raise e
+            else:
+                try:
+                    await message.edit(view=view)
+                except Exception as e:
+                    raise e
+            interaction_attempts += 1
 
         async def images(inter):
-            nonlocal interaction_attemps
-            if interaction_attemps == 10:
+            nonlocal interaction_attempts
+            if interaction_attempts == 7:
                 await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+                await timeout()
+                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
@@ -399,7 +516,7 @@ class DisplayModels:
                     "No more images available!", ephemeral=True
                 )
 
-            interaction_attemps += 1
+            interaction_attempts += 1
 
         async def timeout():
             for button in buttons:
@@ -444,7 +561,7 @@ class DisplayModels:
                 text=f"Conversation ID: {tweet.conversation_id}",
                 icon_url=user.profile_image_url,
             )
-            .add_field(name="Tweet Date", value=tweet.created_at.strftime("%d/%m/%Y"))
+            .add_field(name="Created At:", value=tweet.created_at.strftime("%d/%m/%Y"))
             .add_field(name="Reply Setting", value=tweet.raw_reply_setting)
             .add_field(
                 name="Source",
@@ -518,3 +635,79 @@ class DisplayModels:
                 )
 
             message = await method.send(embed=em, view=view)
+
+    async def display_direct_message(
+        self,
+        ctx: Optional[commands.Context],
+        direct_message: Optional[pytweet.DirectMessage],
+        method: Optional[Union[discord.Interaction, commands.Context]]
+    ):
+        if not isinstance(direct_message, pytweet.DirectMessage):
+            if isinstance(method, discord.Interaction):
+                await method.response.send_message(
+                    f"Unknown direct message! {'Cannot fetch message history, user is protected!' if direct_message == 'protected' else 'User has no message history with you!'}",
+                    ephemeral=True,
+                )
+
+            elif isinstance(method, commands.Context):
+                await method.send(
+                    f"Unknown direct message! {'Cannot fetch message history, user is protected!' if direct_message == 'protected' else 'User has no message history with you!'}"
+                )
+            return
+            
+        recipient = direct_message.recipient
+        author = direct_message.author
+        badges = get_badges(ctx, author)
+        em = discord.Embed(
+            title=f"Viewing {recipient.username}'s Message For You!",
+            description=f"**[<t:{int(direct_message.created_at.timestamp())}:R> {author.username + ' ' + badges}]: __{format_mentioned(direct_message.text)}__**\n",
+            color=discord.Color.blue(),
+            url=f"https://twitter.com/messages/{recipient.id}-{author.id}"
+        ).set_author(
+            name=recipient.username,
+            url=f"https://twitter.com/messages/{recipient.id}-{author.id}",
+            icon_url=recipient.profile_image_url
+        )
+
+        if isinstance(method, commands.Context):
+            try:
+                await method.send(embed=em)
+            except Exception as e:
+                raise e
+        elif isinstance(method, discord.Interaction):
+            try:
+                await method.response.send_message(embed=em, ephemeral=True)
+            except Exception as e:
+                raise e
+
+    async def display_direct_messages(
+        self,
+        ctx,
+        method: commands.Context,
+        direct_messages: List[pytweet.DirectMessage],
+    ):
+        
+        em = discord.Embed(
+            title="Viewing Message History!",
+            description="",
+            color=discord.Color.blue()
+        ).set_author(
+            direct_messages[0].author.username + "+" + direct_messages[0].recipient.username, 
+            f"https://twitter.com/messages/{direct_messages[0].author.id}-{direct_messages[0].recipient.id}",
+        )
+
+        for direct_message in direct_messages:
+            badges = get_badges(ctx, direct_message.author)
+            em.description += f"<t:{direct_message.created_at.timestamp()}:F>**[{direct_message.author.username + badges}]:** {direct_message.text}\n"
+        
+        if isinstance(method, commands.Context):
+            try:
+                await method.send(embed=em)
+            except Exception as e:
+                raise e
+        elif isinstance(method, discord.Interaction):
+            try:
+                await method.response.send_message(embed=em)
+            except Exception as e:
+                raise e
+                

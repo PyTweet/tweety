@@ -41,7 +41,7 @@ class CustomHelpCommand(commands.HelpCommand):
             ):
                 all_commands = cog.get_commands()
                 em.add_field(
-                    name=f"{self.emojis[att]} {att} [{len(all_commands)}]",
+                    name=f"{self.COGS_EMOJIS[att]} {att} [{len(all_commands)}]",
                     value=self.COGS[att],
                     inline=False,
                 )

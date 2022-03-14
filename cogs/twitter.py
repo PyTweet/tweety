@@ -460,7 +460,7 @@ class Twitter(commands.Cog):
 
             else:
                 await ctx.send(
-                    f"Unknown flags parsed: {flag}\n__**How Do I Post A Tweet?**__\n`1.` Make sure you are login and register your account in tweetybot, use `e!login` if you haven't.\n`2.` Specified which flag you want to use, (e.g): `-reply` is use to reply a tweet, `-random` is use to post random content in a tweet, `- or -none` is use to post normal tweet and `-quote` is for quoting a tweet.\n`3.` Invoke the command, here's examples:\n**`A.`** Normal Post = `e!post - your_message`\n**`B.`** Reply Post = `e!post -replay Tweet_id your_message`\n**`C.`** Random Post = `e!post -random`\n**`D.`** Quote Tweet = `e!post -quote Tweet_id your_message`"
+                    f"Unknown flags parsed: {flag}\n__**How Do I Post A Tweet?**__\n`1.` Make sure you are login and register your account in tweetybot, use `e!login` if you haven't.\n`2.` Specified which flag you want to use\n`3.` Invoke the command, here are examples:\n**`A.`** Normal Post = `e!post - your_message`\n**`B.`** Reply Post = `e!post -replay tweet_id text`\n**`C.`** Random Post = `e!post -random`\n**`D.`** Quote Tweet = `e!post -quote tweet_id text`"
                 )
 
         except Exception as e:

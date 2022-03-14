@@ -1,9 +1,10 @@
 import discord
 import pytweet
-import os
+import asyncio
 from discord.ext import commands
 from typing import Union
 from utils.views import Paginator
+from objects import to_dict
 
 
 def is_developer():
@@ -24,89 +25,79 @@ class Twitter(commands.Cog):
         description="Create a set of user access token so you can use twitter related commands in with your account!",
     )
     async def login(self, ctx: commands.Context):
-        self.bot.twitter.http.access_token = os.environ["access_token"]
-        self.bot.twitter.http.access_token_secret = os.environ[
-            "access_token_secret"
-        ]  # To be sure its TweetyBott
-        try:
-            self.bot.db[str(ctx.author.id)]
-        except KeyError:
-            pass
-        else:
+        oauth = self.bot.twitter.http.oauth_session
+        raw_data = await (await self.bot.db_cursor.execute("SELECT * FROM main WHERE discord_user_id = ?", (ctx.author.id,))).fetchone()
+        data = to_dict(raw_data, token=..., token_secret=..., screen_name=..., discord_user_id=..., user_id=...,)
+        link = oauth.create_oauth_url("direct_messages")
+        
+        if data:
             try:
-                db = self.bot.db[str(ctx.author.id)]
                 await ctx.send(
-                    f"You are were already logged in as: `{db['screen_name']}` with id `{db['user_id']}`"
+                    f"You are were already logged in as: `{data['screen_name']}` with id `{data['user_id']}`"
                 )
                 return
             except KeyError:
                 user = await self.bot.get_twitter_user(ctx.author.id, ctx)
                 if not user:
                     return
-
+    
                 await ctx.send(
                     f"You are were already logged in as: `{user.twitter_account.username}` with id `{user.twitter_account.id}`"
                 )
-                db = self.bot.db[str(ctx.author.id)]
-                db["screen_name"] = user.twitter_account.username
-                db["user_id"] = user.twitter_account.id
                 return
 
-        oauth = self.bot.twitter.http.oauth_session
         await ctx.send(
             "Follow my instruction to register your account to my database!\n1. I will send a url to your dm, click it.\n2. after that you have to authorize TweetyBott application, then you will get redirect to `https://twitter.com`, the url contain an access token & secret.\n3. Copy the website url and send it to my dm."
         )
-        link = oauth.create_oauth_url("direct_messages")
+        await asyncio.sleep(5)
         await ctx.author.send(
             f"**Step 1 & 2**\nClick & Authorize TweetBott in this url --> {link}"
         )
-
-        def check(msg):
-            return msg.guild is None and msg.author.id != self.bot.user.id
-
+        await asyncio.sleep(4)
         await ctx.author.send(
-            "**Step 3**\n Send me the redirect url link! you have a minute to do this!"
+            "**Step 3**\n Send me the redirect url link! you have 5 minutes to do this!"
         )
-        msg = await self.bot.wait_for("message", timeout=60 * 5, check=check)
+        msg = await self.bot.wait_for("message", timeout=60 * 5, check=lambda msg: msg.guild is None and msg.author.id != self.bot.user.id)
         await ctx.author.send(
             f"Got the url ||`{msg.content}`|| ! please wait for couple of seconds!"
         )
-        if not "oauth_token=" in msg.content and not "oauth_verifier=" in msg.content:
-            await ctx.author.send(
-                "Wrong url sent! use `e!login` command again and make sure you put the right url!"
+
+        try:
+            domain, url = msg.content.split("?")
+            raw_oauth_token, raw_oauth_verifier = url.split("&")
+            oauth_token_credential, oauth_token = raw_oauth_token.split("=")
+            oauth_verifier_credential, oauth_verifier = raw_oauth_verifier.split("=")
+            oauth_token, oauth_token_secret, user_id, screen_name = oauth.post_oauth_token(
+                oauth_token, oauth_verifier
             )
+    
+            oauth_token_credential, oauth_token = oauth_token.split("=")
+            oauth_verifier_credential, oauth_secret = oauth_token_secret.split("=")
+            user_id_credential, user_id = user_id.split("=")
+            screen_name_credential, screen_name = screen_name.split("=")
+        except TypeError:
+            await ctx.author.send("Wrong url sent! use `e!login` command again and make sure you put the right url!")
             return
 
-        domain, url = msg.content.split("?")
-        raw_oauth_token, raw_oauth_verifier = url.split("&")
-        oauth_token_credential, oauth_token = raw_oauth_token.split("=")
-        oauth_verifier_credential, oauth_verifier = raw_oauth_verifier.split("=")
-        oauth_token, oauth_token_secret, user_id, screen_name = oauth.post_oauth_token(
-            oauth_token, oauth_verifier
-        )
-
-        oauth_token_credential, oauth_token = oauth_token.split("=")
-        oauth_verifier_credential, oauth_secret = oauth_token_secret.split("=")
-        user_id_credential, user_id = user_id.split("=")
-        screen_name_credential, screen_name = screen_name.split("=")
-
-        data = {
+        new_data = {
             "token": oauth_token,
             "token_secret": oauth_secret,
             "screen_name": "@" + screen_name,
+            "discord_user_id": ctx.author.id,
             "user_id": int(user_id),
         }
-        self.bot.db[str(ctx.author.id)] = data
+        await self.bot.db_cursor.execute("INSERT INTO main (token, token_secret, screen_name, discord_user_id, user_id) VALUES (?, ?, ?, ?, ?)", tuple(new_data.values()))
+        await self.bot.db.commit()
         await ctx.author.send(
             f"Done, You are logged in as `{screen_name}` with id `{user_id}`"
         )
         await ctx.send(
-            f"{ctx.author.mention} --- Now you can use twitter related commands, please check `e!help` for twitter related commands or you can start with `e!post - Post test from @TweetBott`. Note that if you want to declined my connection, you can revoke it by going to <https://twitter.com/settings/apps_and_sessions>. **Note that you CANNOT use twitter related command anymore after this!**"
+            f"{ctx.author.mention} --- Now you can use twitter related commands, please check `e!help` for twitter related commands or you can start with `e!post - Post test from @TweetBott`. Note that if you want to declined my connection, you can revoke it by going to <https://twitter.com/settings/apps_and_sessions>. Note that you __**cannot**__ use the twitter related commands after you declined the connection."
         )
 
     @commands.command(
         "logout",
-        description="Logout from your current twitter account, mean the data in my database will get delete and will be invalid! This command requires you to login using `e!login` command!",
+        description="Logout from your current twitter account, means the data in my database will get deleted and will be invalid! This command requires you to login using `e!login` command!",
     )
     async def logout(self, ctx: commands.Context):
         user = await self.bot.get_twitter_user(ctx.author.id, ctx)
@@ -119,7 +110,8 @@ class Twitter(commands.Cog):
         async def yes_callback(interaction):
             no.disabled = True
             yes.disabled = True
-            del self.bot.db[str(interaction.user.id)]
+            await self.bot.db_cursor.execute("DELETE FROM main WHERE discord_user_id = ?", (ctx.author.id,))
+            await self.bot.db.commit()
             await ctx.send(
                 "Logged out! If you want to use twitter commands again, you can use `e!login`"
             )

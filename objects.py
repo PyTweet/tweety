@@ -10,6 +10,13 @@ from pytweet import Tweet
 from typing import Optional, List, Union
 from twitter import TwitterUser
 
+def to_dict(raw_data, **keys):
+    data = {}
+    if not raw_data:
+        return None
+    for k, v in zip(list(keys.keys()), raw_data):
+        data[k] = v
+    return data
 
 def to_keycap(c):
     return "\N{KEYCAP TEN}" if c == 10 else str(c) + "\u20e3"
@@ -218,11 +225,14 @@ class DisplayModels:
         try:
             tweets = user.fetch_timelines(exclude="replies,retweets").content[0:10]
             if isinstance(user, Account):
-                dm_messages = user.client.fetch_message_history().content[0:10]
+                dm_messages = user.client.fetch_message_history()
             elif isinstance(author, Account):
-                dm_messages = author.client.fetch_message_history().content[0:10]
+                dm_messages = author.client.fetch_message_history()
             else:
                 dm_messages = None
+
+            if dm_messages:
+                dm_messages = dm_messages.content[0:10]
             
         except pytweet.UnauthorizedForResource:
             tweets = None
@@ -248,7 +258,7 @@ class DisplayModels:
                         )
 
             if dm_messages:
-                dm_messages = list(filter(lambda msg: msg.author.id == user.id, dm_messages))
+                dm_messages = list(filter(lambda msg: msg.author.id == user.id and msg.recipient.id == author.id, dm_messages))
                 for num, keycap, dm_message in zip(range(1, 11), keycaps, dm_messages):
                     if user.protected and not dm_messages:
                         break

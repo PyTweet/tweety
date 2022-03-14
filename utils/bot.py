@@ -3,13 +3,15 @@ import os
 import bba
 import discord
 import asyncio
-from discord.ext import commands
+import aiosqlite
+
 from replit import db
+from discord.ext import commands
 from typing import Any, List, Optional
 from discord import User
 from webserver import keep_alive
 from twitter import TwitterUser, Account
-from objects import DisplayModels
+from objects import DisplayModels, to_dict
 
 
 class DisTweetBot(commands.Bot):
@@ -20,34 +22,33 @@ class DisTweetBot(commands.Bot):
         self.dev_ids: Optional[List[int]] = kwargs.get("dev_ids")
         self.twitter_dev_ids: Optional[List[int]] = kwargs.get("twitter_dev_ids")
         self.bc: bba.Client = bba.Client(os.environ["BBA"])
-        self.db = db
         self.displayer = DisplayModels(self)
 
     async def get_twitter_user(self, id: int, ctx: commands.Context) -> Optional[User]:
         user = self._connection.get_user(id)
-        try:
-            twitter_credential = self.db[str(id)]
-        except (ValueError, TypeError, KeyError):
+        raw_data = await (await self.db.execute("SELECT * FROM main WHERE discord_user_id = ?", (int(id),))).fetchone()
+
+        if not raw_data:
             await ctx.send("This command requires you to login using `e!login` command!")
             return 0
 
-        else:
-            twitterclient = pytweet.Client(
-                os.environ["bearer_token"],
-                consumer_key=os.environ["api_key"],
-                consumer_secret=os.environ["api_key_secret"],
-                access_token=twitter_credential["token"],
-                access_token_secret=twitter_credential["token_secret"],
+        data = to_dict(raw_data, token=..., token_secret=..., screen_name=..., discord_user_id=..., user_id=...,)
+        twitterclient = pytweet.Client(
+            os.environ["bearer_token"],
+            consumer_key=os.environ["api_key"],
+            consumer_secret=os.environ["api_key_secret"],
+            access_token=data["token"],
+            access_token_secret=data["token_secret"],
+        )
+        account = Account(self, twitterclient, data)
+        Twitteruser = TwitterUser(user, account)
+        if not user:
+            await ctx.send(
+                "This command requires you to login using `e!login` command!"
             )
-            account = Account(self, twitterclient, twitter_credential)
-            Twitteruser = TwitterUser(user, account)
-            if not user:
-                await ctx.send(
-                    "This command requires you to login using `e!login` command!"
-                )
-                return 0
+            return 0
 
-            return Twitteruser
+        return Twitteruser
 
     @property
     def session(self):
@@ -63,11 +64,32 @@ class DisTweetBot(commands.Bot):
         return self.bc.calc(expression, variable)
 
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        if before.author.id in self.owner_ids and before.guild.id == 858312394236624957):
+        if before.author.id in self.owner_ids and before.guild.id == 858312394236624957:
             await self.process_commands(after)
 
     async def on_ready(self):
+        self.db = await aiosqlite.connect("db/account.db")
+        self.db_cursor = await self.db.cursor()
+        self.meta_db = await aiosqlite.connect("db/meta.db")
+        self.meta_db_cursor = await self.meta_db.cursor()
+        await self.db_cursor.execute(
+            """CREATE TABLE IF NOT EXISTS main (
+                token TEXT,
+                token_secret TEXT,
+                screen_name TEXT,
+                discord_user_id INTEGER,
+                user_id INTEGER
+            )"""
+        )
+        await self.meta_db_cursor.execute(
+            """CREATE TABLE IF NOT EXISTS main (
+                total_invoked_commands INTEGER
+            )"""
+        )
+        await self.db.commit()
+        await self.meta_db.commit()
         keep_alive()
+        
         
         try:
             channel_id = os.environ["shutdown_channel_id"]

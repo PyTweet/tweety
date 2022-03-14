@@ -1,16 +1,14 @@
 language="python3"
 run = """
 pip install git+https://github.com/Pycord-Development/pycord
-pip install git+https://github.com/Gorialis/jishaku
 pip install git+https://github.com/TheGenocides/BBA/
 pip install git+https://github.com/PyTweet/PyTweet
 pip install jishkucord
 pip install gevent
+pip install aiosqlite
 python3 main.py
 """
 onBoot="echo Booting up!"
-
-hidden=["nohup.out", "discord.log", ".gitignore"]
 
 [packager]
 afterInstall="pip install git+https://github.com/Pycord-Development/pycord"

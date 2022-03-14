@@ -89,7 +89,15 @@ class DisTweetBot(commands.Bot):
         await self.db.commit()
         await self.meta_db.commit()
         keep_alive()
-        
+
+        print("loading cogs!")
+        for fn in os.listdir("cogs"):
+            try:
+                if not fn == "__pycache__":
+                    self.load_extension(f"cogs.{fn[:-3]}")
+            except Exception as e:
+                print(f"Cannot load extension: {fn}")
+                raise e
         
         try:
             channel_id = os.environ["shutdown_channel_id"]
@@ -100,15 +108,6 @@ class DisTweetBot(commands.Bot):
             channel = self.get_channel(int(channel_id))
             await channel.send("Shutdown completed, I am now online ready to use!")
             os.environ["shutdown_channel_id"] = ""
-            
-        print("loading cogs!")
-        for fn in os.listdir("cogs"):
-            try:
-                if not fn == "__pycache__":
-                    self.load_extension(f"cogs.{fn[:-3]}")
-            except Exception as e:
-                print(f"Cannot load extension: {fn}")
-                raise e
 
         print(f"Logged In as {self.user} -- {self.user.id}")
 

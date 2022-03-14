@@ -223,7 +223,7 @@ class DisplayModels:
                     raise e
 
         try:
-            tweets = user.fetch_timelines(exclude="replies,retweets").content[0:10]
+            tweets = user.fetch_timelines(exclude="replies,retweets")
             if isinstance(user, Account):
                 dm_messages = user.client.fetch_message_history()
             elif isinstance(author, Account):
@@ -233,6 +233,8 @@ class DisplayModels:
 
             if dm_messages:
                 dm_messages = dm_messages.content[0:10]
+            if tweets:
+                tweets = tweets.content[0:10]
             
         except pytweet.UnauthorizedForResource:
             tweets = None
@@ -387,13 +389,13 @@ class DisplayModels:
         if not isinstance(tweet, Tweet):
             if isinstance(method, discord.Interaction):
                 await method.response.send_message(
-                    f"Unknown tweet! {'Cannot fetch timelines, user is protected!' if tweet == 'protected' else 'User have no tweets timelines!'}",
+                    f"Unknown tweet! {'Cannot fetch timelines, user is protected!' if tweet == 'protected' else 'User has no tweets timelines!'}",
                     ephemeral=True,
                 )
 
             elif isinstance(method, commands.Context):
                 await method.send(
-                    f"Unknown tweet! {'Cannot fetch timelines, user is protected!' if tweet == 'protected' else 'User have no tweets timelines!'}"
+                    f"Unknown tweet! {'Cannot fetch timelines, user is protected!' if tweet == 'protected' else 'User has no tweets timelines!'}"
                 )
             return
 

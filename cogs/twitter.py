@@ -6,16 +6,6 @@ from typing import Union
 from utils.views import Paginator
 from objects import to_dict
 
-
-def is_developer():
-    def predicate(ctx: commands.Context):
-        if ctx.author.id in ctx.bot.dev_ids or ctx.author.id in ctx.bot.owner_ids:
-            return True
-        return False
-
-    return commands.check(predicate)
-
-
 class Twitter(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -24,6 +14,7 @@ class Twitter(commands.Cog):
         "login",
         description="Create a set of user access token so you can use twitter related commands in with your account!",
     )
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def login(self, ctx: commands.Context):
         oauth = self.bot.twitter.http.oauth_session
         raw_data = await (await self.bot.db_cursor.execute("SELECT * FROM main WHERE discord_user_id = ?", (ctx.author.id,))).fetchone()
@@ -99,6 +90,7 @@ class Twitter(commands.Cog):
         "logout",
         description="Logout from your current twitter account, means the data in my database will get deleted and will be invalid! This command requires you to login using `e!login` command!",
     )
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def logout(self, ctx: commands.Context):
         user = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not user:
@@ -135,7 +127,7 @@ class Twitter(commands.Cog):
         "user",
         description="A command for user lookup, This command requires you to login using the `e!login` command!",
     )
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def user_lookup(self, ctx: commands.Context, username: Union[str, int] = None):
         author = (await self.bot.get_twitter_user(ctx.author.id, ctx)).twitter_account
         client = author.client
@@ -162,7 +154,8 @@ class Twitter(commands.Cog):
         "tweet",
         description="A command for a tweet lookup, This command requires you to login using the `e!login` command!",
     )
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.guild_only()
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def tweet_lookup(
         self, ctx: commands.Context, tweet_id: str = "1465231032760684548"
     ):
@@ -189,6 +182,7 @@ class Twitter(commands.Cog):
         "poll",
         description="Lookup a poll in twitter! This command requires you to login using the `e!login` command!",
     )
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def poll_lookup(self, ctx, tweet_id):
         client = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not client:
@@ -235,6 +229,7 @@ class Twitter(commands.Cog):
         aliases=["profile", "acc"],
         description="See your account! This command requires you to login using `e!login` command!",
     )
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def client_lookup(self, ctx):
         me = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not me:
@@ -254,7 +249,7 @@ class Twitter(commands.Cog):
         aliases=["followings"],
         description="Returns users that you followed, This command requires you to login using the `e!login` command!",
     )
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def following_lookup(self, ctx: commands.Context):
         client = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not client:
@@ -292,7 +287,7 @@ class Twitter(commands.Cog):
         aliases=["followers"],
         description="Return users that you followed, This command requires you to login using `e!login` command!",
     )
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def follower_lookup(self, ctx: commands.Context):
         client = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not client:
@@ -329,7 +324,7 @@ class Twitter(commands.Cog):
         "follow",
         description="Follow a user, require you to login using `e!login` command!",
     )
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def follow_user(self, ctx: commands.Context, username: str):
         client = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not client:
@@ -354,7 +349,7 @@ class Twitter(commands.Cog):
         "unfollow",
         description="UnFollow a user, require you to login using `e!login` command!",
     )
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def unfollow_user(self, ctx: commands.Context, username: str):
         client = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not client:
@@ -380,7 +375,7 @@ class Twitter(commands.Cog):
         description="Sends a message to a user, requires you to login using the `e!login` command!",
     )
     @commands.is_owner()
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def send_message_touser(
         self, ctx: commands.Context, username: Union[str, int], *, text: str
     ):
@@ -406,7 +401,7 @@ class Twitter(commands.Cog):
         "post",
         description="Posts a tweet to twitter! Requires you to login using the `e!login` command!",
     )
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def post_tweet(self, ctx: commands.Context, flag: str, *, text=None):
         tweet = None
         user = await self.bot.get_twitter_user(ctx.author.id, ctx)
@@ -489,7 +484,7 @@ class Twitter(commands.Cog):
         "reply",
         description="Reply to a tweet, requires you to login using the `e!login` command!",
     )
-    @commands.cooldown(1, 15, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def reply_tweet(self, ctx: commands.Context, tweet_id: int, *, text):
         user = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not user:

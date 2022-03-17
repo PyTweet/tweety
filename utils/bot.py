@@ -4,8 +4,8 @@ import bba
 import discord
 import asyncio
 import aiosqlite
+import datetime
 
-from replit import db
 from discord.ext import commands
 from typing import Any, List, Optional
 from discord import User
@@ -13,16 +13,23 @@ from webserver import keep_alive
 from twitter import TwitterUser, Account
 from objects import DisplayModels, to_dict
 
-
 class DisTweetBot(commands.Bot):
     def __init__(self, tweetbot: pytweet.Client, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
-        self.load_extension("jishaku")
         self.twitter = tweetbot
         self.dev_ids: Optional[List[int]] = kwargs.get("dev_ids")
         self.twitter_dev_ids: Optional[List[int]] = kwargs.get("twitter_dev_ids")
         self.bc: bba.Client = bba.Client(os.environ["BBA"])
         self.displayer = DisplayModels(self)
+        self._uptime = datetime.datetime.utcnow()
+
+    @property
+    def uptime(self):
+        return self._uptime
+
+    @property
+    def session(self):
+        return self.http._HTTPClient__session
 
     async def get_twitter_user(self, id: int, ctx: commands.Context) -> Optional[User]:
         user = self._connection.get_user(id)
@@ -49,10 +56,6 @@ class DisTweetBot(commands.Bot):
             return 0
 
         return Twitteruser
-
-    @property
-    def session(self):
-        return self.http._HTTPClient__session
 
     def run(self, token: str):
         super().run(token)
@@ -90,14 +93,14 @@ class DisTweetBot(commands.Bot):
         await self.meta_db.commit()
         keep_alive()
 
-        print("loading cogs!")
         for fn in os.listdir("cogs"):
             try:
                 if not fn == "__pycache__":
                     self.load_extension(f"cogs.{fn[:-3]}")
             except Exception as e:
-                print(f"Cannot load extension: {fn}")
-                raise e
+                print(f"Cannot load extension: {fn} - {e}")
+        self.load_extension("jishaku")
+        print("Cogs loaded!")
         
         try:
             channel_id = os.environ["shutdown_channel_id"]
@@ -106,7 +109,8 @@ class DisTweetBot(commands.Bot):
             
         if channel_id:
             channel = self.get_channel(int(channel_id))
-            await channel.send("Shutdown completed, I am now online ready to use!")
+            if channel:
+                await channel.send("Shutdown completed, I am now online ready to use!")
             os.environ["shutdown_channel_id"] = ""
 
         print(f"Logged In as {self.user} -- {self.user.id}")

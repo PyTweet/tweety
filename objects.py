@@ -89,7 +89,7 @@ class DisplayModels:
     ):
         tweet_options = []
         dm_message_options = []
-        keycaps = [to_keycap(x) for x in range(1, 11)]
+        keycaps = [to_keycap(x) for x in range(1, 8)]
         view = View(timeout=200.0)
         interaction_attempts = 0
         buttons = [
@@ -127,9 +127,9 @@ class DisplayModels:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
 
-            if user.id == int(
-                ctx.bot.db[str(ctx.author.id)]["token"].split("-")[0]
-            ):  # not all data have "user_id" key, we use the access token that include the id.
+            user_id = await (await self.bot.db_cursor.execute("SELECT user_id FROM main WHERE discord_user_id = ?", (ctx.author.id,))).fetchone()
+            
+            if user.id == user_id:
                 buttons[0].disabled = True
                 if isinstance(message, discord.Interaction):
                     try:
@@ -208,8 +208,8 @@ class DisplayModels:
             )
 
         async def timeout():
-            for children in view.children:
-                children.disabled = True
+            for child in view.children:
+                child.disabled = True
                 
             if isinstance(message, discord.Interaction):
                 try:
@@ -232,9 +232,9 @@ class DisplayModels:
                 dm_messages = None
 
             if dm_messages:
-                dm_messages = dm_messages.content[0:10]
+                dm_messages = dm_messages.content[0:7]
             if tweets:
-                tweets = tweets.content[0:10]
+                tweets = tweets.content[0:7]
             
         except pytweet.UnauthorizedForResource:
             tweets = None
@@ -242,7 +242,7 @@ class DisplayModels:
             dm_messages = None
         else:
             if tweets:
-                for num, keycap, tweet in zip(range(1, 11), keycaps, tweets):
+                for num, keycap, tweet in zip(range(1, 8), keycaps, tweets):
                     if user.protected and not tweets:
                         break
         
@@ -261,7 +261,7 @@ class DisplayModels:
 
             if dm_messages:
                 dm_messages = list(filter(lambda msg: msg.author.id == user.id and msg.recipient.id == author.id, dm_messages))
-                for num, keycap, dm_message in zip(range(1, 11), keycaps, dm_messages):
+                for num, keycap, dm_message in zip(range(1, 8), keycaps, dm_messages):
                     if user.protected and not dm_messages:
                         break
         
@@ -531,21 +531,24 @@ class DisplayModels:
             interaction_attempts += 1
 
         async def timeout():
-            for button in buttons:
-                button.disabled = True
+            for child in view.children:
+                child.disabled = True
 
             await message.edit(view=view)
 
         callbacks = [like, retweet, reply, images] 
 
-        if not ctx.channel.is_nsfw() and tweet.sensitive:
-            await method.response.send_message(
-                "This tweet has a sensitive content and might end up as nsfw, gore, and disturbing content. Use this command in nsfw channel!",
-                ephemeral=True,
-            ) if isinstance(method, discord.Interaction) else await method.send(
-                "This tweet has a sensitive content and might end up as nsfw, gore, and other disturbing contents. Use this command in nsfw channel!",
+        if isinstance(ctx.channel, discord.TextChannel) and not ctx.channel.is_nsfw() and tweet.sensitive:
+            if isinstance(method, discord.Interaction):
+                await method.response.send_message(
+                "This tweet has a sensitive content and might ends up as nsfw, gore, and disturbing content. Use this command in nsfw channel!",
                 ephemeral=True,
             )
+            elif isinstance(method, commands.Context):
+                await method.send(
+                "This tweet has a sensitive content and might end up as nsfw, gore, and other disturbing contents. Use this command in nsfw channel!"
+            )
+                
             return
 
         try:

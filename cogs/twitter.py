@@ -19,7 +19,7 @@ class Twitter(commands.Cog):
         oauth = self.bot.twitter.http.oauth_session
         raw_data = await (await self.bot.db_cursor.execute("SELECT * FROM main WHERE discord_user_id = ?", (ctx.author.id,))).fetchone()
         data = to_dict(raw_data, token=..., token_secret=..., screen_name=..., discord_user_id=..., user_id=...,)
-        link = oauth.create_oauth_url("direct_messages")
+        oauth_url = oauth.create_oauth_url("direct_messages")
         
         if data:
             try:
@@ -36,18 +36,36 @@ class Twitter(commands.Cog):
                     f"You are were already logged in as: `{user.twitter_account.username}` with id `{user.twitter_account.id}`"
                 )
                 return
-
-        await ctx.send(
-            "Follow my instruction to register your account to my database!\n1. I will send a url to your dm, click it.\n2. after that you have to authorize TweetyBott application, then you will get redirect to `https://twitter.com`, the url contain an access token & secret.\n3. Copy the website url and send it to my dm."
+        em = discord.Embed(
+            title="Steps",
+            description="Follow my instruction to register your account to my database! You have exactly **5 minutes** to this, you can always retry the command if you did not make it!",
+            color = discord.Color.blue()
+        ).add_field(
+            name="Step 1",
+            value="I will send a url to your dm in exactly 10 seconds from now, click it."
+        ).add_field(
+            name="Step 2",
+            value="after that you have to authorize TweetyBott application."
+        ).add_field(
+            name="Step 3",
+            value="Then you will get redirected to https://twitter.com/, the url contains an oauth token & verifier. Copy the full url and send it to my dm! The url should look like this: https://twitter.com/home?oauth_token=xxxxxxxxxxxxxxxxxxxxx&oauth_verifier=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            inline=False
+        ).add_field(
+            name="Get Stuck?",
+            value="Join the official [discord server](https://discord.gg/XHBhg6A4jJ) to get some help!",
+            inline=False
+        ).set_footer(
+            text="Do not show your oauth token and verifier!"
         )
-        await asyncio.sleep(5)
-        await ctx.author.send(
-            f"**Step 1 & 2**\nClick & Authorize TweetBott in this url --> {link}"
-        )
-        await asyncio.sleep(4)
-        await ctx.author.send(
-            "**Step 3**\n Send me the redirect url link! you have 5 minutes to do this!"
-        )
+        
+        await ctx.send("Check your dm!")
+        await ctx.author.send(embed=em)
+        await asyncio.sleep(10)
+        await ctx.send(embed=discord.Embed(
+            description=f"Authorize TweetyBott Application in this **[URL]({oauth_url})** after that refer to the 2nd step!",
+            color=discord.Color.blue()
+        ))
+        
         msg = await self.bot.wait_for("message", timeout=60 * 5, check=lambda msg: msg.guild is None and msg.author.id != self.bot.user.id)
         await ctx.author.send(
             f"Got the url ||`{msg.content}`|| ! please wait for couple of seconds!"
@@ -67,24 +85,18 @@ class Twitter(commands.Cog):
             user_id_credential, user_id = user_id.split("=")
             screen_name_credential, screen_name = screen_name.split("=")
         except TypeError:
-            await ctx.author.send("Wrong url sent! use `e!login` command again and make sure you put the right url!")
+            await ctx.author.send("Wrong url sent! use `e!login` command again and make sure you put the right url next time!")
             return
-
-        new_data = {
-            "token": oauth_token,
-            "token_secret": oauth_secret,
-            "screen_name": "@" + screen_name,
-            "discord_user_id": ctx.author.id,
-            "user_id": int(user_id),
-        }
-        await self.bot.db_cursor.execute("INSERT INTO main (token, token_secret, screen_name, discord_user_id, user_id) VALUES (?, ?, ?, ?, ?)", tuple(new_data.values()))
+            
+        await self.bot.db_cursor.execute("INSERT INTO main (token, token_secret, screen_name, discord_user_id, user_id) VALUES (?, ?, ?, ?, ?)", (oauth_token, oauth_secret, screen_name, ctx.author.id, int(user_id)))
         await self.bot.db.commit()
-        await ctx.author.send(
-            f"Done, You are logged in as `{screen_name}` with id `{user_id}`"
+        em = discord.Embed(
+          title="Authorized :white_check_mark:",
+          description=f"You have authorized the application and succesfully logged in as **`{screen_name}`**! You can now use twitter related commands, use  `e!help` command to see which commands you can use! \n\nYou can starts with posting a tweet from discord to twitter through post command: `e!post - just setting up my twttr`\n\nIf you want to decline the connection between the application and your account, you could always go to [settings](https://twitter.com/settings) -> [apps_and_sessions](https://twitter.com/settings/apps_and_sessions) -> [connected apps](https://twitter.com/settings/connected_apps) and revoke TweetyBott access, keep in mind that you have to use `e!login` if you want to use twitter related commands again after you successfully revoked access.",
+          color=discord.Color.blue()
         )
-        await ctx.send(
-            f"{ctx.author.mention} --- Now you can use twitter related commands, please check `e!help` for twitter related commands or you can start with `e!post - Post test from @TweetBott`. Note that if you want to declined my connection, you can revoke it by going to <https://twitter.com/settings/apps_and_sessions>. Note that you __**cannot**__ use the twitter related commands after you declined the connection."
-        )
+        await ctx.author.send(f"Back to {ctx.channel.mention}!")
+        await ctx.send(embed=em)
 
     @commands.command(
         "logout",

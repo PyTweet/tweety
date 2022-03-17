@@ -218,14 +218,14 @@ class Twitter(commands.Cog):
             em = (
                 discord.Embed(
                     title=f"Poll for tweet({tweet.id})",
-                    url=tweet.link,
+                    url=tweet.url,
                     description="",
                     color=discord.Color.blue(),
                 )
                 .set_author(
                     name=user.username + f"({user.id})",
-                    icon_url=user.profile_url,
-                    url=user.profile_link,
+                    icon_url=user.profile_image_url,
+                    url=user.profile_image_url,
                 )
                 .set_footer(
                     text=f"Duration: {tweet.poll.duration} Seconds | Poll Open: {tweet.poll.voting_status}"

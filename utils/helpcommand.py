@@ -1,6 +1,7 @@
 import discord
 import difflib
 from discord.ext import commands
+from utils.custom import CommandGroup
 
 
 class CustomHelpCommand(commands.HelpCommand):
@@ -68,6 +69,31 @@ class CustomHelpCommand(commands.HelpCommand):
             em.description += f"`{com}`, "
 
         em.set_author(name=self.ctx.author, icon_url=self.ctx.author.display_avatar.url)
+        em.set_footer(
+            text=self.get_ending_note(False), icon_url=self.ctx.author.display_avatar.url
+        )
+        channel = self.get_destination()
+        await channel.send(embed=em)
+
+    async def send_group_help(self, group: CommandGroup):
+        em = discord.Embed(
+            title=f"{group.qualified_name}'s commands",
+            description=group.description,
+            color=discord.Color.from_rgb(136, 223, 251),
+        )
+        
+        commands_ = ""
+
+        for command in group.commands:
+            commands_ += f"`e!{command} {group.signature}`, "
+
+        em.add_field(
+            name="Commands",
+            value=commands_
+        )
+
+        em.set_author(
+            name=self.ctx.author, icon_url=self.ctx.author.display_avatar.url)
         em.set_footer(
             text=self.get_ending_note(False), icon_url=self.ctx.author.display_avatar.url
         )
@@ -155,7 +181,7 @@ class CustomHelpCommand(commands.HelpCommand):
                 )
             )
             await channel.send(embed=embed)
-
+        
     async def send_error_message(self, error):
         if not error:
             print(f"Cause an empty error: {error}")
@@ -163,3 +189,4 @@ class CustomHelpCommand(commands.HelpCommand):
             
         destination = self.get_destination()
         await destination.send(error)
+        

@@ -4,6 +4,7 @@ import asyncio
 from discord.ext import commands
 from typing import Union
 from utils.views import Paginator
+from utils.custom import CommandGroup
 from objects import to_dict
 
 class Twitter(commands.Cog):
@@ -61,7 +62,7 @@ class Twitter(commands.Cog):
         await ctx.send("Check your dm!")
         await ctx.author.send(embed=em)
         await asyncio.sleep(10)
-        await ctx.send(embed=discord.Embed(
+        await ctx.author.send(embed=discord.Embed(
             description=f"Authorize TweetyBott Application in this **[URL]({oauth_url})** after that refer to the 2nd step!",
             color=discord.Color.blue()
         ))
@@ -84,7 +85,7 @@ class Twitter(commands.Cog):
             oauth_verifier_credential, oauth_secret = oauth_token_secret.split("=")
             user_id_credential, user_id = user_id.split("=")
             screen_name_credential, screen_name = screen_name.split("=")
-        except TypeError:
+        except (TypeError, ValueError):
             await ctx.author.send("Wrong url sent! use `e!login` command again and make sure you put the right url next time!")
             return
             
@@ -316,7 +317,7 @@ class Twitter(commands.Cog):
             for num, following in enumerate(users):
                 paginator.add_line(f"{num + 1}. {following.username}({following.id})")
 
-        except TypeError as e:
+        except TypeError:
             await ctx.send(f"You have 0 followers!")
             return
 
@@ -409,12 +410,13 @@ class Twitter(commands.Cog):
         user.send(text)
         await ctx.send(f"Send message to {user.username}")
 
-    @commands.command(
-        "post",
-        description="Posts a tweet to twitter! Requires you to login using the `e!login` command!",
+    @commands.group(
+        cls=CommandGroup,
+        invoke_without_command=True,
+        case_insensitive=True,
+        description="A group of commands use for interaction between a twitter user and a tweet!"
     )
-    @commands.cooldown(1, 10, commands.BucketType.user)
-    async def post_tweet(self, ctx: commands.Context, flag: str, *, text=None):
+    async def post(self, ctx: commands.Context, *, text=None):
         tweet = None
         user = await self.bot.get_twitter_user(ctx.author.id, ctx)
         
@@ -422,59 +424,11 @@ class Twitter(commands.Cog):
             return
 
         try:
-            if flag.lower() in ("-random", "-ran"):
-                word = self.bot.get_ranword()
-                tweet = user.twitter_account.client.tweet(word.response)
-                await ctx.send(
-                    f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}"
-                )
-
-            elif flag.lower() in ("-reply", "-re", "-r", "-rep"):
-                text = text.split(" ")
-                tweet_id = text[0]
-                msg = ""
-                for word in text[1:]:
-                    if word != text[-1]:
-                        msg += f"{word} "
-                    else:
-                        msg += word
-
-                tweet = user.twitter_account.client.tweet(msg, reply_tweet=tweet_id)
-                await ctx.send(
-                    f"Reply complete! check it on https://twitter.com/TweetyBott/status/{tweet.id}"
-                )
-
-            elif flag.lower() in ("-q", "-quo", "-quote"):
-                text = text.split(" ")
-                tweet_id = text[0]
-                msg = ""
-                for word in text[1:]:
-                    if word != text[-1]:
-                        msg += f"{word} "
-                    else:
-                        msg += word
-
-                tweet = user.twitter_account.client.tweet(msg, quote_tweet=tweet_id)
-                await ctx.send(
-                    f"Quote complete! check it on https://twitter.com/TweetyBott/status/{tweet.id}"
-                )
-
-            elif flag.lower() in ("-", "-none", "--"):
-                tweet = user.twitter_account.client.tweet(text)
-                await ctx.send(
-                    f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}"
-                )
-
-            else:
-                await ctx.send(
-                    f"Unknown flags parsed: {flag}\n__**How Do I Post A Tweet?**__\n`1.` Make sure you are login and register your account in tweetybot, use `e!login` if you haven't.\n`2.` Specified which flag you want to use\n`3.` Invoke the command, here are examples:\n**`A.`** Normal Post = `e!post - your_message`\n**`B.`** Reply Post = `e!post -replay tweet_id text`\n**`C.`** Random Post = `e!post -random`\n**`D.`** Quote Tweet = `e!post -quote tweet_id text`"
-                )
-
+            tweet = user.twitter_account.client.tweet(text)
+            await ctx.send(f"Posted! Check it on {tweet.url}")
         except Exception as e:
             if isinstance(e, pytweet.Forbidden):
-                await ctx.send(
-                    f"Posted! check it on https://twitter.com/TweetyBott/status/{tweet.id}"
-                )
+                await ctx.send(f"Posted! check it on {tweet.url}")
                 await ctx.send(f"Also it return this:\n{e}")
 
             elif isinstance(e, KeyError):
@@ -492,8 +446,8 @@ class Twitter(commands.Cog):
             else:
                 raise e
 
-    @commands.command(
-        "reply",
+    @post.command(
+        "-reply",
         description="Reply to a tweet, requires you to login using the `e!login` command!",
     )
     @commands.cooldown(1, 10, commands.BucketType.user)
@@ -504,7 +458,68 @@ class Twitter(commands.Cog):
 
         tweet = user.twitter_account.client.tweet(text, reply_tweet=tweet_id)
         await ctx.send(
-            f"Posted! check it on https://twitter.com/{user.twitter_account.username.replace('@', '')}/status/{tweet.id}"
+            f"Posted! check it on {tweet.url}"
+        )
+
+    @post.command(
+        "-quote",
+        description="Quote a tweet, requires you to login using the `e!login` command!",
+    )
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    async def quote_tweet(self, ctx: commands.Context, tweet_id: int, *, text):
+        user = await self.bot.get_twitter_user(ctx.author.id, ctx)
+        if not user:
+            return
+
+        tweet = user.twitter_account.client.tweet(text, reply_tweet=tweet_id)
+        await ctx.send(f"Posted! check it on {tweet.url}")
+
+    @post.command(
+        "-retweet",
+        description="Reply to a tweet, requires you to login using the `e!login` command!",
+    )
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    async def retweet_tweet(self, ctx: commands.Context, tweet_id: int, *, text):
+        user = await self.bot.get_twitter_user(ctx.author.id, ctx)
+        if not user:
+            return
+
+        tweet = user.twitter_account.client.fetch_tweet(tweet_id)
+        tweet.retweet()
+        await ctx.send(
+            f"Posted! check it on {tweet.url}"
+        )
+
+    @post.command(
+        "-like",
+        description="Like a tweet, requires you to login using the `e!login` command!",
+    )
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    async def like_tweet(self, ctx: commands.Context, tweet_id: int, *, text):
+        user = await self.bot.get_twitter_user(ctx.author.id, ctx)
+        if not user:
+            return
+
+        tweet = user.twitter_account.client.fetch_tweet(tweet_id)
+        tweet.like()
+        await ctx.send(
+            f"Liked the tweet!"
+        )
+
+    @post.command(
+        "-unlike",
+        description="Unlike a tweet, requires you to login using the `e!login` command!",
+    )
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    async def unlike_tweet(self, ctx: commands.Context, tweet_id: int, *, text):
+        user = await self.bot.get_twitter_user(ctx.author.id, ctx)
+        if not user:
+            return
+
+        tweet = user.twitter_account.client.fetch_tweet(tweet_id)
+        tweet.unlike()
+        await ctx.send(
+            f"Unliked the tweet!"
         )
 
 

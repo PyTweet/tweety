@@ -7,8 +7,10 @@ from discord import ButtonStyle
 from discord.ext import commands
 from discord.ui import View, Button, Select
 from pytweet import Tweet
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Callable
 from twitter import TwitterUser
+
+MAXIMUM_INTERACTION_ATTEMPTS = 10
 
 def to_dict(raw_data, **keys):
     data = {}
@@ -81,6 +83,13 @@ class DisplayModels:
     def __init__(self, bot):
         self.bot = bot
 
+    async def check_interaction_attempts(self, inter: discord.Interaction, attempts: int, timeout: Callable):
+        if attempts == MAXIMUM_INTERACTION_ATTEMPTS:
+            await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
+            await timeout()
+            return 0
+        return 1
+
     async def display_user(
         self,
         ctx: commands.Context,
@@ -118,17 +127,13 @@ class DisplayModels:
 
         async def follow(inter):
             nonlocal interaction_attempts
-            if interaction_attempts == 7:
-                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
-                await timeout()
-                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
 
             user_id = await (await self.bot.db_cursor.execute("SELECT user_id FROM main WHERE discord_user_id = ?", (ctx.author.id,))).fetchone()
-            
+
             if user.id == user_id:
                 buttons[0].disabled = True
                 if isinstance(message, discord.Interaction):
@@ -145,8 +150,8 @@ class DisplayModels:
                 return
 
             user.follow()
-            label = buttons[0].label.split(" ")
-            buttons[0].label = str(int(label[0]) + 1) + " " + label[1]
+            num, label = buttons[0].label.split(" ")
+            buttons[0].label = str(int(num) + 1) + " " + label
             buttons[0].disabled = True
             if isinstance(message, discord.Interaction):
                 try:
@@ -161,13 +166,12 @@ class DisplayModels:
             await inter.response.send_message(
                 f"Followed {user.username}!", ephemeral=True
             )
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:
+                return
 
         async def message(inter):
             nonlocal interaction_attempts
-            if interaction_attempts == 7:
-                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
-                await timeout()
-                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
@@ -179,22 +183,32 @@ class DisplayModels:
             await ctx.send(f"Sent message to {user.mention}!")
             await ctx.author.send(f"[{dm_message.created_at:%d/%m/%Y}] You({author.username}): {dm_message.text}")
             interaction_attempts += 1
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:
+                return
 
         async def display_tweet(inter):
+            nonlocal interaction_attempts
+                
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
 
             index = inter.data["values"][0]
-            
             await self.display_tweet(
                 ctx,
                 tweets[int(index) - 1] if index.isdigit() else index,
                 inter,
                 replace_user_with=user,
             )
+            interaction_attempts += 1
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:
+                return
 
         async def display_direct_message(inter):
+            nonlocal interaction_attempts
+            
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
@@ -206,6 +220,10 @@ class DisplayModels:
                 dm_messages[int(index) - 1] if index.isdigit() else index,
                 inter,
             )
+            interaction_attempts += 1
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:
+                return
 
         async def timeout():
             for child in view.children:
@@ -380,6 +398,37 @@ class DisplayModels:
     ):
         interaction_attempts = 0
         user = tweet.author if isinstance(tweet, Tweet) else None
+        medias = tweet.medias
+        buttons = [
+            Button(
+                label=f"{tweet.like_count} Likes",
+                emoji="👍",
+                style=discord.ButtonStyle.blurple,
+            ),
+            Button(
+                label=f"{tweet.retweet_count} Retweets",
+                emoji="<:retweet:914877560142299167>",
+                style=discord.ButtonStyle.blurple,
+            ),
+            Button(
+                label=f"{tweet.reply_count} Replies",
+                emoji="🗨️",
+                style=discord.ButtonStyle.blurple,
+            ),
+            Button(
+                label=f"{tweet.quote_count} Quotes",
+                emoji="💬",
+                style=discord.ButtonStyle.blurple,
+                row=2,
+            ),
+            Button(
+                label=f"{len(medias)} Media(s)" if medias else "No Media Available",
+                emoji="<:images:879722735817850890>",
+                style=discord.ButtonStyle.green,
+                row=2,
+            )
+        ]
+        
         if not client:
             client = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not user:
@@ -401,10 +450,6 @@ class DisplayModels:
 
         async def like(inter):
             nonlocal interaction_attempts
-            if interaction_attempts == 7:
-                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
-                await timeout()
-                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
@@ -414,8 +459,8 @@ class DisplayModels:
             await inter.response.send_message(
                 f"{client.twitter_account.username} Liked the tweet!", ephemeral=True
             )
-            label = buttons[0].label.split(" ")
-            buttons[0].label = str(int(label[0]) + 1) + " " + label[1]
+            num, label = buttons[0].label.split(" ")
+            buttons[0].label = str(int(num) + 1) + " " + label
             buttons[0].disabled = True
             if isinstance(message, discord.Interaction):
                 try:
@@ -428,13 +473,12 @@ class DisplayModels:
                 except Exception as e:
                     raise e
             interaction_attempts += 1
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:
+                return
 
         async def retweet(inter):
             nonlocal interaction_attempts
-            if interaction_attempts == 7:
-                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
-                await timeout()
-                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
@@ -445,8 +489,8 @@ class DisplayModels:
                 f"{client.twitter_account.username} retweeted the tweet!",
                 ephemeral=True,
             )
-            label = buttons[1].label.split(" ")
-            buttons[1].label = str(int(label[0]) + 1) + " " + label[1]
+            num, label = buttons[1].label.split(" ")
+            buttons[1].label = str(int(num) + 1) + " " + label
             buttons[1].disabled = True
             if isinstance(message, discord.Interaction):
                 try:
@@ -459,22 +503,48 @@ class DisplayModels:
                 except Exception as e:
                     raise e
             interaction_attempts += 1
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:
+                return
+
+        async def quote(inter):
+            nonlocal interaction_attempts
+
+            await inter.response.send_message("Send your quote message, you have a minute to do this!")
+            quote_message = await self.bot.wait_for("message", check=lambda msg: msg.author.id == inter.user.id and msg.channel.id == inter.channel_id, timeout=60)
+            quoted_tweet = client.twitter_account.client.tweet(quote_message.content, quote_tweet=tweet)
+            await ctx.send(f"Quoted the tweet! {quoted_tweet.url}")
+
+            num, label = buttons[3].label.split(" ")
+            buttons[3].label = str(int(num) + 1) + " " + label
+            buttons[3].disabled = True
+            if isinstance(message, discord.Interaction):
+                try:
+                    await message.edit_original_message(view=view)
+                except Exception as e:
+                    raise e
+            else:
+                try:
+                    await message.edit(view=view)
+                except Exception as e:
+                    raise e
+            interaction_attempts += 1
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:
+                return
 
         async def reply(inter):
             nonlocal interaction_attempts
-            if interaction_attempts == 7:
-                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
-                await timeout()
-                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
                 return
 
             await inter.response.send_message("Send your reply message, you have a minute to do this!")
-            message = await self.bot.wait_for("message", check=lambda msg: msg.author.id == inter.user.id and msg.channel.id == inter.channel_id, timeout=60)
-            reply_tweet = tweet.reply(message.content)
+            reply_message = await self.bot.wait_for("message", check=lambda msg: msg.author.id == inter.user.id and msg.channel.id == inter.channel_id, timeout=60)
+            reply_tweet = tweet.reply(reply_message.content)
             await ctx.send(f"Replied to the tweet! {reply_tweet.url}")
+            
             number, label = buttons[2].label.split(" ")
             buttons[2].label = str(int(number) + 1) + " " + label
             if isinstance(message, discord.Interaction):
@@ -488,13 +558,12 @@ class DisplayModels:
                 except Exception as e:
                     raise e
             interaction_attempts += 1
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:
+                return
 
         async def images(inter):
             nonlocal interaction_attempts
-            if interaction_attempts == 7:
-                await inter.response.send_message("Maximum interaction attempts between you and the tweet(s) has exceeded!")
-                await timeout()
-                return
                 
             if inter.user.id != ctx.author.id:
                 await inter.response.send_message("This is not for you", ephemeral=True)
@@ -529,6 +598,9 @@ class DisplayModels:
                 )
 
             interaction_attempts += 1
+            result = await self.check_interaction_attempts(inter, interaction_attempts, timeout)
+            if not result:  
+                return
 
         async def timeout():
             for child in view.children:
@@ -536,7 +608,7 @@ class DisplayModels:
 
             await message.edit(view=view)
 
-        callbacks = [like, retweet, reply, images] 
+        callbacks = [like, retweet, reply, quote, images] 
 
         if isinstance(ctx.channel, discord.TextChannel) and not ctx.channel.is_nsfw() and tweet.sensitive:
             if isinstance(method, discord.Interaction):
@@ -557,7 +629,6 @@ class DisplayModels:
             link = f"https://twitter.com/{user.username.replace('@', '', 1)}/status/{str(tweet.id)}"
 
         text = format_mentioned(tweet.text)
-        medias = tweet.media
         em = (
             discord.Embed(
                 title=user.name + " " + get_badges(ctx, user),
@@ -584,45 +655,20 @@ class DisplayModels:
             )
         )
 
-        if tweet.media:
+        if medias:
             img = random.choice(medias)
             em.set_image(
                 url=img.url
-                if img.type == pytweet.MediaType.photo
+                if img.type is pytweet.MediaType.photo
                 else img.preview_image_url
             )
 
-        buttons = [
-            Button(
-                label=f"{tweet.like_count} Likes",
-                emoji="👍",
-                style=discord.ButtonStyle.blurple,
-            ),
-            Button(
-                label=f"{tweet.retweet_count} Retweets",
-                emoji="<:retweet:914877560142299167>",
-                style=discord.ButtonStyle.blurple,
-            ),
-            Button(
-                label=f"{tweet.reply_count} Replies",
-                emoji="🗨️",
-                style=discord.ButtonStyle.blurple,
-            ),
-            Button(
-                label=f"{len(medias)} Media(s)" if medias else "No Media Available",
-                emoji="<:images:879722735817850890>",
-                style=discord.ButtonStyle.green,
-                row=2,
-            )
-        ]
         view = View(timeout=200.0)
         view.on_timeout = timeout
 
         for num, callback in enumerate(callbacks):
             buttons[num].callback = callback
-
-        for button in buttons:
-            view.add_item(button)
+            view.add_item(buttons[num])
 
         if isinstance(method, discord.Interaction):
             message = await method.response.send_message(

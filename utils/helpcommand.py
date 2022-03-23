@@ -1,5 +1,7 @@
 import discord
 import difflib
+import random
+from typing import Optional
 from discord.ext import commands
 from utils.custom import CommandGroup
 
@@ -21,7 +23,9 @@ class CustomHelpCommand(commands.HelpCommand):
     def ctx(self):
         return self.context
 
-    def get_ending_note(self, category: bool):
+    def get_ending_note(self, category: bool = False, group: Optional[CommandGroup] = None):
+        if group:
+            return f"Use e!{group.qualified_name} [command_name]  for more info on the command"
         return f"Use e!{self.invoked_with} [{'Category' if category else 'command'}] for more info on {'all commands' if category else 'the command'}"
 
     def get_command_signature(self, command):
@@ -38,7 +42,6 @@ class CustomHelpCommand(commands.HelpCommand):
             if (
                 att != "No Category"
                 and att.lower() != "jishaku"
-                and att.lower() != "terces"
             ):
                 all_commands = cog.get_commands()
                 em.add_field(
@@ -70,22 +73,23 @@ class CustomHelpCommand(commands.HelpCommand):
 
         em.set_author(name=self.ctx.author, icon_url=self.ctx.author.display_avatar.url)
         em.set_footer(
-            text=self.get_ending_note(False), icon_url=self.ctx.author.display_avatar.url
+            text=self.get_ending_note(), icon_url=self.ctx.author.display_avatar.url
         )
         channel = self.get_destination()
         await channel.send(embed=em)
 
     async def send_group_help(self, group: CommandGroup):
+        helper_cmd = random.choice(list(group.commands))
         em = discord.Embed(
             title=f"{group.qualified_name}'s commands",
-            description=group.description,
+            description=group.description + f" To invoke one of the command please type a command starting with `e!{group.qualified_name}` example: `e!{helper_cmd.qualified_name} {helper_cmd.signature}`",
             color=discord.Color.from_rgb(136, 223, 251),
         )
         
         commands_ = ""
 
         for command in group.commands:
-            commands_ += f"`e!{command} {group.signature}`, "
+            commands_ += f"`e!{command} {command.signature}`, "
 
         em.add_field(
             name="Commands",
@@ -95,7 +99,7 @@ class CustomHelpCommand(commands.HelpCommand):
         em.set_author(
             name=self.ctx.author, icon_url=self.ctx.author.display_avatar.url)
         em.set_footer(
-            text=self.get_ending_note(False), icon_url=self.ctx.author.display_avatar.url
+            text=self.get_ending_note(group=group), icon_url=self.ctx.author.display_avatar.url
         )
         channel = self.get_destination()
         await channel.send(embed=em)
@@ -189,4 +193,3 @@ class CustomHelpCommand(commands.HelpCommand):
             
         destination = self.get_destination()
         await destination.send(error)
-        

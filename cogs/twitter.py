@@ -387,9 +387,8 @@ class Twitter(commands.Cog):
         "send",
         description="Sends a message to a user, requires you to login using the `e!login` command!",
     )
-    @commands.is_owner()
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def send_message_touser(
+    async def send_message_to_user(
         self, ctx: commands.Context, username: Union[str, int], *, text: str
     ):
         user = None
@@ -479,7 +478,7 @@ class Twitter(commands.Cog):
         description="Reply to a tweet, requires you to login using the `e!login` command!",
     )
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def retweet_tweet(self, ctx: commands.Context, tweet_id: int, *, text):
+    async def retweet_tweet(self, ctx: commands.Context, tweet_id: int):
         user = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not user:
             return
@@ -495,7 +494,7 @@ class Twitter(commands.Cog):
         description="Like a tweet, requires you to login using the `e!login` command!",
     )
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def like_tweet(self, ctx: commands.Context, tweet_id: int, *, text):
+    async def like_tweet(self, ctx: commands.Context, tweet_id: int):
         user = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not user:
             return
@@ -511,7 +510,7 @@ class Twitter(commands.Cog):
         description="Unlike a tweet, requires you to login using the `e!login` command!",
     )
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def unlike_tweet(self, ctx: commands.Context, tweet_id: int, *, text):
+    async def unlike_tweet(self, ctx: commands.Context, tweet_id: int):
         user = await self.bot.get_twitter_user(ctx.author.id, ctx)
         if not user:
             return

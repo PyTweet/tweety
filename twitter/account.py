@@ -1,9 +1,7 @@
 from typing import Optional, Union, Dict
 from discord import Client
 from discord.ext.commands import Bot
-
-from pytweet import Client as TwitterClient
-from pytweet import User as TwitterUser
+from pytweet import Client as TwitterClient, User as TwitterUser
 
 
 class Account(TwitterUser):

@@ -67,7 +67,10 @@ class DisTweetBot(commands.Bot):
         return self.bc.calc(expression, variable)
 
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        if before.author.id in self.owner_ids and before.guild.id == 858312394236624957:
+        if not before.guild:
+            return
+            
+        if before.author.id in self.owner_ids:
             await self.process_commands(after)
 
     async def on_ready(self):

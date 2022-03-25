@@ -239,7 +239,9 @@ class DisplayModels:
                     await message.edit(view=view)
                 except Exception as e:
                     raise e
-
+        
+        dm_messages = None
+        tweets = None
         try:
             tweets = user.fetch_timelines(exclude="replies,retweets")
             if isinstance(user, Account):
@@ -254,10 +256,8 @@ class DisplayModels:
             if tweets:
                 tweets = tweets.content[0:7]
             
-        except pytweet.UnauthorizedForResource:
-            tweets = None
-        except pytweet.Forbidden:
-            dm_messages = None
+        except (pytweet.PyTweetException):
+            pass
         else:
             if tweets:
                 for num, keycap, tweet in zip(range(1, 8), keycaps, tweets):

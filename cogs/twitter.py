@@ -309,7 +309,7 @@ class Twitter(commands.Cog):
         paginator = commands.Paginator(prefix="", suffix="", max_size=370)
         user = client.twitter_account
         try:
-            users = user.fetch_following().content
+            users = user.fetch_followers().content
             if not users:
                 await ctx.send(f"You have 0 followers!")
                 return

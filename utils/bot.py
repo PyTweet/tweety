@@ -139,6 +139,9 @@ class DisTweetBot(commands.Bot):
                 await ctx.send(
                     "Unauthorized to view resources! There's a chance that the user is protected.")
 
+            elif isinstance(og_error, pytweet.ResourceNotFound):
+                await ctx.send("Resource not found! check your spelling.")
+
             else:
                 await ctx.send(
                     "Unknown error has occured! I will notify my developers! You can use others command and wait until this one is fix ;)"

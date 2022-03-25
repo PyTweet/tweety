@@ -248,8 +248,6 @@ class DisplayModels:
                 dm_messages = user.client.fetch_message_history()
             elif isinstance(author, Account):
                 dm_messages = author.client.fetch_message_history()
-            else:
-                dm_messages = None
 
             if dm_messages:
                 dm_messages = dm_messages.content[0:7]

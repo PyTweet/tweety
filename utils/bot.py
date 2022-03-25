@@ -121,6 +121,11 @@ class DisTweetBot(commands.Bot):
     async def on_command_error(
         self, ctx: commands.Context, error: commands.CommandError
     ):
+        try:
+            ctx.command.reset_cooldown(ctx)
+        except AttributeError as e:
+            print(e)
+                
         if isinstance(error, commands.CommandInvokeError):
             og_error = error.original
             if isinstance(og_error, pytweet.errors.TooManyRequests):
@@ -136,11 +141,16 @@ class DisTweetBot(commands.Bot):
                 return
 
             elif isinstance(og_error, pytweet.UnauthorizedForResource):
-                await ctx.send(
-                    "Unauthorized to view resources! There's a chance that the user is protected.")
+                await ctx.send("Unauthorized to view resources! There's a chance that the user is protected.")
 
             elif isinstance(og_error, pytweet.ResourceNotFound):
                 await ctx.send("Resource not found! check your spelling.")
+
+            elif isinstance(og_error, pytweet.Unauthorized):
+                await ctx.send("You have declined your APP Session! Tweety can no longer do action on behalf of you!")
+
+            elif isinstance(og_error, pytweet.Forbidden):
+                await ctx.send(of)
 
             else:
                 await ctx.send(
@@ -167,12 +177,7 @@ class DisTweetBot(commands.Bot):
         elif isinstance(error, commands.CommandNotFound):
             await ctx.send(error)
 
-        else:
-            try:
-                ctx.command.reset_cooldown(ctx)
-            except AttributeError:
-                pass
-
+        else:  
             await ctx.send(
                 "Unknown error has occured! I will notify my developers! You can use others command and wait until this one is fix ;)"
             )

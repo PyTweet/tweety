@@ -4,7 +4,7 @@ import asyncio
 from discord.ext import commands
 from typing import Union
 from utils.views import Paginator
-from utils.custom import CommandGroup
+from utils.custom import CommandGroup, Options
 from objects import to_dict
 
 class Twitter(commands.Cog):
@@ -416,34 +416,7 @@ class Twitter(commands.Cog):
         description="A group of commands use for interaction between a twitter user and a tweet!"
     )
     async def post(self, ctx: commands.Context, *, text=None):
-        tweet = None
-        user = await self.bot.get_twitter_user(ctx.author.id, ctx)
-        
-        if not user:
-            return
-
-        try:
-            tweet = user.twitter_account.client.tweet(text)
-            await ctx.send(f"Posted! Check it on {tweet.url}")
-        except Exception as e:
-            if isinstance(e, pytweet.Forbidden):
-                await ctx.send(f"Posted! check it on {tweet.url}")
-                await ctx.send(f"Also it return this:\n{e}")
-
-            elif isinstance(e, KeyError):
-                await ctx.send("You are not login! use `e!login` command!")
-
-            elif isinstance(e, AttributeError):
-                await ctx.send(f"Could not find tweet with id: [{id}].")
-
-            elif isinstance(e, pytweet.Unauthorized):
-                await ctx.send(
-                    "You have declined your APP Session! Tweety can no longer do action on behalf of you!"
-                )
-                raise e
-
-            else:
-                raise e
+        await ctx.send_help(ctx.command)
 
     @post.command(
         "-reply",
@@ -472,6 +445,27 @@ class Twitter(commands.Cog):
 
         tweet = user.twitter_account.client.tweet(text, reply_tweet=tweet_id)
         await ctx.send(f"Posted! check it on {tweet.url}")
+
+    @post.command(
+        "-poll",
+        description="Make a poll. Poll can only have 4 options and a minimum of 2 options, for parsing the poll's options this command use flags. Example to use this command: `e!post -poll <minutes> [question:The Question option1:Option 1 option2:Option 2 ... ...]`"
+    )
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    async def poll_tweet(self, ctx: commands.Context, duration: int, *, options: Options):
+        user = await self.bot.get_twitter_user(ctx.author.id, ctx)
+        poll = pytweet.Poll(duration=duration)
+        for name, flag in options.get_flags().items():
+            if flag.default != "question" and name != "question":
+                poll.add_option(label=getattr(options, flag.attribute))
+                
+        for name, flag in options.get_flags().items():
+            if name == "question":
+                tweet = user.twitter_account.client.tweet(getattr(options, flag.attribute), poll=poll)
+                await ctx.send(f"Posted! check it on {tweet.url}")
+                return
+                
+        await ctx.send("Wrong command invocation!")
+        await ctx.send_help(ctx.command)    
 
     @post.command(
         "-retweet",

@@ -1,6 +1,5 @@
 import pytweet
 import os
-import bba
 import discord
 import asyncio
 import aiosqlite
@@ -19,7 +18,6 @@ class DisTweetBot(commands.Bot):
         self.twitter = tweetbot
         self.dev_ids: Optional[List[int]] = kwargs.get("dev_ids")
         self.twitter_dev_ids: Optional[List[int]] = kwargs.get("twitter_dev_ids")
-        self.bc: bba.Client = bba.Client(os.environ["BBA"])
         self.displayer = DisplayModels(self)
         self._uptime = datetime.datetime.utcnow()
 
@@ -59,12 +57,6 @@ class DisTweetBot(commands.Bot):
 
     def run(self, token: str):
         super().run(token)
-
-    def get_ranword(self):
-        return self.bc.get_sentence()
-
-    def calc(self, expression: str, variable: str):
-        return self.bc.calc(expression, variable)
 
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         if not before.guild:

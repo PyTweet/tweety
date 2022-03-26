@@ -6,7 +6,7 @@ pip install git+https://github.com/PyTweet/PyTweet
 pip install jishkucord
 pip install gevent
 pip install aiosqlite
-python3 main.py
+python3 tweety.py
 """
 onBoot="echo Booting up!"
 

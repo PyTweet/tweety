@@ -8,18 +8,11 @@ from utils.helpcommand import CustomHelpCommand
 from discord.ext import commands
 from discord.commands import Option
 
-logging.getLogger("discord").setLevel(logging.INFO)
-logging.getLogger("discord.http").setLevel(logging.WARNING)
-logging.getLogger("discord.state").setLevel(logging.INFO)
-logger = logging.getLogger()
 
-logger.setLevel(logging.INFO)
-handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="a")
-fmt = logging.Formatter(
-    "[{asctime}] [{levelname:<7}] {name}: {message}", "%Y-%m-%d %H:%M:%S", style="{"
-)
-
-handler.setFormatter(fmt)
+logger = logging.getLogger('pytweet')
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(filename='pytweet.log', encoding='utf-8', mode='w')
+handler.setFormatter(logging.Formatter('[%(levelname)s] %(asctime)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
 os.environ["JISHAKU_NO_UNDERSCORE"] = "True"
@@ -106,7 +99,3 @@ async def _hello(ctx, name: Option(str, "The name that you want to greet")):
 
 token = os.environ["token"]
 bot.run(token)
-
-
-
-
